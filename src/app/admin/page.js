@@ -1,13 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
 import { CATEGORIES } from "@/lib/constants/categories";
 
 const TABS = [
-  { id: "loans", label: "השאלות פעילות" },
   { id: "books", label: "כל הספרים" },
+  { id: "loans", label: "השאלות פעילות" },
   { id: "borrowers", label: "שואלים" },
 ];
 const PAGE_SIZE = 100;
@@ -26,6 +26,38 @@ const AREAS_BM = [
   "משולש כניסה",
   "משולש כניסה - ספריית תפילה על שם יהלומי",
 ];
+
+// ── Copy Button ──────────────────────────────────────────
+function CopyButton({ text }) {
+  const [copied, setCopied] = React.useState(false);
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      style={{
+        padding: "8px 10px",
+        borderRadius: T.radiusSm,
+        background: copied ? T.greenLt : T.surface2,
+        color: copied ? T.green : T.text3,
+        border: `1px solid ${copied ? T.greenBorder : T.border}`,
+        fontSize: 12,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        fontFamily: T.fontBody,
+        transition: "all 0.2s",
+      }}
+    >
+      {copied ? "✓ הועתק" : "העתק"}
+    </button>
+  );
+}
 
 // ── Book Modal ─────────────────────────────────────────────
 function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
@@ -58,7 +90,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
         .map((t) => t.trim())
         .filter(Boolean)
     : [];
-
   const AREAS_LIBRARY_NAMED = [
     "ספרייה עגולה",
     "ספריית הוראה",
@@ -67,7 +98,7 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
     "ספריית אנגלית",
     "משולש כניסה - ספריית תפילה על שם יהלומי",
   ];
-  const AREAS_BM = [
+  const AREAS_BM_MODAL = [
     "משולש ימין קדמי",
     "משולש ימין אחורי",
     "משולש שמאל קדמי",
@@ -76,12 +107,10 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
     "משולש כניסה - ספריית תפילה על שם יהלומי",
   ];
 
-  // רווח אחרי אות ראשונה → מקף
   const normalizedQuery =
     catQuery.length >= 2 && catQuery[1] === " "
       ? catQuery[0] + "-" + catQuery.slice(2)
       : catQuery;
-
   const filteredCats = normalizedQuery.trim()
     ? CATEGORIES.filter(
         (c) =>
@@ -89,8 +118,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
           c.desc.toLowerCase().includes(normalizedQuery.toLowerCase()),
       ).slice(0, 30)
     : [];
-
-  // אות ראשונה בלבד — הצג את כל הקטגוריות באותה אות
   const displayCats =
     normalizedQuery.trim().length === 1
       ? CATEGORIES.filter((c) =>
@@ -101,29 +128,24 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
   function handleRoomChange(room) {
     setForm((f) => ({ ...f, room, area: "" }));
   }
-
   function handleCategorySelect(cat) {
     setForm((f) => ({
       ...f,
       category: cat.code,
-      // בספרייה — אזור = קוד קטגוריה אוטומטית
       area: f.room === "ספרייה" ? cat.code : f.area,
     }));
     setCatQuery(cat.code);
     setCatOpen(false);
   }
-
   function addTag(e) {
     if (e.key === "Enter" && tagInput.trim()) {
       e.preventDefault();
-      const newTag = tagInput.trim();
-      if (!tags.includes(newTag)) {
-        setForm((f) => ({ ...f, tags: [...tags, newTag].join(",") }));
-      }
+      const t = tagInput.trim();
+      if (!tags.includes(t))
+        setForm((f) => ({ ...f, tags: [...tags, t].join(",") }));
       setTagInput("");
     }
   }
-
   function removeTag(tag) {
     setForm((f) => ({ ...f, tags: tags.filter((t) => t !== tag).join(",") }));
   }
@@ -142,9 +164,9 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
         setError(data.error);
         return;
       }
-      if (saveAndAdd === "duplicate" && onSaveAndAdd) {
+      if (saveAndAdd === "duplicate" && onSaveAndAdd)
         onSaveAndAdd(form.tempCopyCode, { ...form, tempCopyCode: "" });
-      } else if (saveAndAdd && onSaveAndAdd) onSaveAndAdd(form.tempCopyCode);
+      else if (saveAndAdd && onSaveAndAdd) onSaveAndAdd(form.tempCopyCode);
       else onSave(form.tempCopyCode);
     } catch {
       setError("שגיאת שרת");
@@ -336,12 +358,11 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
     </div>
   );
 
-  // אזורים לפי חדר
   const areaOptions =
     form.room === "ספרייה"
       ? [...AREAS_LIBRARY_NAMED, ...(form.category ? [form.category] : [])]
       : form.room === "בית מדרש"
-        ? AREAS_BM
+        ? AREAS_BM_MODAL
         : [];
 
   return (
@@ -350,16 +371,9 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
         <div style={s.title}>{isEdit ? "עריכת ספר" : "הוספת ספר"}</div>
         {error && <div style={s.alert}>{error}</div>}
         <div style={s.grid}>
-          {/* קוד ספר */}
           {F("tempCopyCode", "קוד ספר *")}
-
-          {/* שם הספר */}
           {F("bookName", "שם הספר *")}
-
-          {/* מחבר */}
           {F("authorName", "מחבר")}
-
-          {/* תפקיד מחבר */}
           <div style={s.field}>
             <label style={s.label}>תפקיד</label>
             <select
@@ -376,8 +390,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               <option value="הוצאה">הוצאה</option>
             </select>
           </div>
-
-          {/* קטגוריה — autocomplete */}
           <div style={{ ...s.field, gridColumn: "1 / -1" }}>
             <label style={s.label}>קטגוריה</label>
             <div style={s.catWrap}>
@@ -425,8 +437,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               )}
             </div>
           </div>
-
-          {/* חדר */}
           <div style={s.field}>
             <label style={s.label}>חדר</label>
             <select
@@ -439,8 +449,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               <option value="בית מדרש">בית מדרש</option>
             </select>
           </div>
-
-          {/* אזור */}
           <div style={s.field}>
             <label style={s.label}>אזור</label>
             <select
@@ -457,8 +465,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               ))}
             </select>
           </div>
-
-          {/* מדיניות */}
           <div style={s.field}>
             <label style={s.label}>מדיניות השאלה</label>
             <select
@@ -473,8 +479,6 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               <option value="השאלה לטווח קצר">השאלה לטווח קצר</option>
             </select>
           </div>
-
-          {/* תגיות */}
           <div style={{ ...s.field, gridColumn: "1 / -1" }}>
             <label style={s.label}>תגיות — הקלד ולחץ Enter</label>
             <div
@@ -498,11 +502,7 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
               />
             </div>
           </div>
-
-          {/* תיאור */}
           {F("description", "תיאור", true, true)}
-
-          {/* הערות */}
           {F("notes", "הערות", true, true)}
         </div>
         <div style={s.actions}>
@@ -919,6 +919,7 @@ function BookRow({
   onOpened,
 }) {
   const [open, setOpen] = useState(false);
+  const [fullBook, setFullBook] = useState(null);
 
   useEffect(() => {
     if (autoOpen) {
@@ -931,7 +932,17 @@ function BookRow({
       }, 300);
     }
   }, [autoOpen]);
-  const borrowed = r.active_loan_id?.trim();
+
+  useEffect(() => {
+    if (open && r.isBorrowed && !fullBook) {
+      fetch(`/api/books/${encodeURIComponent(r.tempCopyCode)}`)
+        .then((res) => res.json())
+        .then(setFullBook)
+        .catch(() => {});
+    }
+  }, [open, r.isBorrowed, r.tempCopyCode]);
+
+  const borrowed = r.isBorrowed;
   const inactive = r.isActive === "FALSE";
   const location = [r.room, r.area].filter(Boolean).join(", ");
 
@@ -989,6 +1000,19 @@ function BookRow({
             })}
           >
             {open ? "⌃" : "⌄"}
+          </td>
+        )}
+        {!selectionMode && (
+          <td
+            style={td({
+              fontFamily: "monospace",
+              fontSize: 11,
+              color: T.text3,
+              borderTop: open ? `2px solid ${T.border}` : "none",
+              whiteSpace: "nowrap",
+            })}
+          >
+            {r.serialNum || "—"}
           </td>
         )}
         <td
@@ -1171,6 +1195,45 @@ function BookRow({
                   <div style={{ fontSize: 13 }}>{r.tags || "—"}</div>
                 </div>
               </div>
+              {borrowed && fullBook?.activeLoan?.borrower && (
+                <div style={{ marginBottom: 10 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: T.text3,
+                      textTransform: "uppercase",
+                      marginBottom: 3,
+                    }}
+                  >
+                    מושאל אצל
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+                    {fullBook.activeLoan.borrower.firstName}{" "}
+                    {fullBook.activeLoan.borrower.lastName}
+                  </div>
+                  <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>
+                    ת"ז: {fullBook.activeLoan.borrower.borrowerID}
+                    {fullBook.activeLoan.borrower.phone && (
+                      <span style={{ marginRight: 10 }}>
+                        📞 {fullBook.activeLoan.borrower.phone}
+                      </span>
+                    )}
+                  </div>
+                  {fullBook.activeLoan.loanDate && (
+                    <div style={{ fontSize: 12, color: T.text3, marginTop: 2 }}>
+                      הושאל: {fullBook.activeLoan.loanDate}
+                      {fullBook.activeLoan.dueDate &&
+                        ` · להחזיר עד: ${fullBook.activeLoan.dueDate}`}
+                    </div>
+                  )}
+                </div>
+              )}
+              {borrowed && !fullBook && (
+                <div style={{ fontSize: 12, color: T.text3, marginBottom: 10 }}>
+                  טוען פרטי שואל...
+                </div>
+              )}
               <div
                 style={{
                   height: 1,
@@ -1218,6 +1281,289 @@ function BookRow({
   );
 }
 
+// ── Borrower Row ───────────────────────────────────────────
+function BorrowerRow({ r, s, td, onEdit, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [full, setFull] = useState(null);
+
+  useEffect(() => {
+    if (open && !full) {
+      fetch(`/api/borrowers/${encodeURIComponent(r.borrowerID)}`)
+        .then((res) => res.json())
+        .then(setFull)
+        .catch(() => {});
+    }
+  }, [open, r.borrowerID]);
+
+  const labelStyle = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: T.text3,
+    textTransform: "uppercase",
+    marginBottom: 3,
+  };
+  const valueStyle = { fontSize: 13, color: T.text };
+
+  return (
+    <>
+      <tr
+        style={{ cursor: "pointer", background: open ? T.surface : "" }}
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={(e) => {
+          if (!open) e.currentTarget.style.background = "#f5f7ff";
+        }}
+        onMouseLeave={(e) => {
+          if (!open) e.currentTarget.style.background = "";
+        }}
+      >
+        <td
+          style={td({
+            width: 20,
+            paddingRight: 8,
+            paddingLeft: 0,
+            color: T.text3,
+            fontSize: 11,
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {open ? "⌃" : "⌄"}
+        </td>
+        <td
+          style={td({
+            fontFamily: "monospace",
+            fontSize: 12,
+            color: T.text3,
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {r.borrowerID}
+        </td>
+        <td style={td({ borderTop: open ? `2px solid ${T.border}` : "none" })}>
+          {r.firstName || "—"}
+        </td>
+        <td
+          style={td({
+            fontWeight: 500,
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {r.lastName || "—"}
+        </td>
+        <td
+          style={td({
+            color: T.text3,
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {r.shiur || "—"}
+        </td>
+        <td
+          style={td({
+            color: T.text3,
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {r.phone || "—"}
+        </td>
+        <td style={td({ borderTop: open ? `2px solid ${T.border}` : "none" })}>
+          {r.isBlocked === "TRUE" && (
+            <span
+              style={{
+                padding: "3px 10px",
+                borderRadius: 999,
+                fontSize: 11.5,
+                fontWeight: 600,
+                background: T.redLt,
+                color: T.red,
+              }}
+            >
+              חסום
+            </span>
+          )}
+        </td>
+        <td
+          style={td({
+            textAlign: "center",
+            borderTop: open ? `2px solid ${T.border}` : "none",
+          })}
+        >
+          {r.activeLoansCount > 0 ? (
+            <span
+              style={{
+                padding: "3px 10px",
+                borderRadius: 999,
+                fontSize: 11.5,
+                fontWeight: 600,
+                background: T.redLt,
+                color: T.red,
+              }}
+            >
+              {r.activeLoansCount}
+            </span>
+          ) : (
+            <span style={{ color: T.text3 }}>0</span>
+          )}
+        </td>
+        <td
+          style={td({ borderTop: open ? `2px solid ${T.border}` : "none" })}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button style={s.btnSmall(T.accent)} onClick={() => onEdit(r)}>
+            ערוך
+          </button>
+          <button style={s.btnSmall(T.red)} onClick={() => onDelete(r)}>
+            מחק
+          </button>
+        </td>
+      </tr>
+
+      {open && (
+        <tr>
+          <td
+            colSpan={9}
+            style={{ padding: 0, borderBottom: `2px solid ${T.border}` }}
+          >
+            <div
+              style={{ padding: "16px 20px", background: T.surface }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {!full ? (
+                <div style={{ fontSize: 13, color: T.text3 }}>טוען...</div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(140px,1fr))",
+                      gap: 12,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div>
+                      <div style={labelStyle}>שם מלא</div>
+                      <div style={valueStyle}>
+                        {full.firstName} {full.lastName}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>ת"ז</div>
+                      <div style={valueStyle}>{full.borrowerID}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>סוג</div>
+                      <div style={valueStyle}>{full.type || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>שיעור</div>
+                      <div style={valueStyle}>{full.shiur || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>מחזור</div>
+                      <div style={valueStyle}>{full.year || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>טלפון</div>
+                      <div style={valueStyle}>{full.phone || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>אימייל</div>
+                      <div style={valueStyle}>{full.email || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>סטטוס</div>
+                      <div style={{ fontSize: 13 }}>
+                        {full.isBlocked === "TRUE" ? (
+                          <span style={{ color: T.red, fontWeight: 600 }}>
+                            חסום
+                          </span>
+                        ) : (
+                          <span style={{ color: T.green }}>פעיל</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={labelStyle}>סה"כ השאלות</div>
+                      <div style={valueStyle}>{full.totalLoans || 0}</div>
+                    </div>
+                    {full.comments && (
+                      <div style={{ gridColumn: "1/-1" }}>
+                        <div style={labelStyle}>הערות</div>
+                        <div style={valueStyle}>{full.comments}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {full.activeLoans?.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          height: 1,
+                          background: T.borderSoft,
+                          margin: "0 0 12px",
+                        }}
+                      />
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: T.text3,
+                          textTransform: "uppercase",
+                          marginBottom: 8,
+                        }}
+                      >
+                        ספרים מושאלים כרגע ({full.activeLoans.length})
+                      </div>
+                      {full.activeLoans.map((l) => (
+                        <div
+                          key={l.loanID}
+                          style={{
+                            padding: "7px 12px",
+                            background: T.surface2,
+                            borderRadius: T.radiusSm,
+                            border: `1px solid ${T.border}`,
+                            fontSize: 13,
+                            marginBottom: 6,
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span style={{ fontWeight: 500 }}>
+                            {l.bookName || l.bookID}
+                          </span>
+                          <span style={{ color: T.text3, fontSize: 12 }}>
+                            {l.loanDate}
+                            {l.dueDate && ` · עד ${l.dueDate}`}
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+              <div
+                style={{
+                  height: 1,
+                  background: T.borderSoft,
+                  margin: "12px 0",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={s.btnSmall(T.accent)} onClick={() => onEdit(r)}>
+                  ✏️ ערוך
+                </button>
+                <button style={s.btnSmall(T.red)} onClick={() => onDelete(r)}>
+                  🗑️ מחק
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 // ── Bulk Action Bar ────────────────────────────────────────
 function BulkBar({ selected, rows, onClose, onAction, processing }) {
   const selectedRows = rows.filter((r) => selected.has(r.tempCopyCode));
@@ -1225,7 +1571,6 @@ function BulkBar({ selected, rows, onClose, onAction, processing }) {
   const anyActive = selectedRows.some((r) => r.isActive !== "FALSE");
   const count = selected.size;
   const canDelete = allInactive && count > 0;
-  const deleteDisabled = !canDelete;
 
   const s = {
     bar: {
@@ -1300,7 +1645,7 @@ function BulkBar({ selected, rows, onClose, onAction, processing }) {
         📋 שנה מדיניות
       </button>
       <div style={s.divider} />
-      {deleteDisabled ? (
+      {!canDelete ? (
         <span style={s.tooltip}>מחיקה זמינה רק לספרים לא פעילים</span>
       ) : (
         <button
@@ -1324,7 +1669,7 @@ export default function AdminPage() {
   const router = useRouter();
   const { responsive } = useResponsive();
   const [stats, setStats] = useState(null);
-  const [tab, setTab] = useState("loans");
+  const [tab, setTab] = useState("books");
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -1332,21 +1677,21 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("");
   const [sortDir, setSortDir] = useState("asc");
-
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPolicy, setFilterPolicy] = useState("all");
   const [filterRoom, setFilterRoom] = useState("all");
   const [filterArea, setFilterArea] = useState("all");
-
+  const [filterType, setFilterType] = useState("all");
   const [bookModal, setBookModal] = useState(null);
   const [openBookCode, setOpenBookCode] = useState(null);
   const [borrowerModal, setBorrowerModal] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [policyModal, setPolicyModal] = useState(false);
-
   const [selectionMode, setSelectionMode] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [backupMsg, setBackupMsg] = useState("");
+  const [selected, setSelected] = useState(new Set());
+  const [processing, setProcessing] = useState(false);
 
   async function handleBackup() {
     setBackingUp(true);
@@ -1366,8 +1711,6 @@ export default function AdminPage() {
       setBackingUp(false);
     }
   }
-  const [selected, setSelected] = useState(new Set());
-  const [processing, setProcessing] = useState(false);
 
   const refreshStats = () =>
     fetch("/api/admin?view=stats")
@@ -1391,6 +1734,7 @@ export default function AdminPage() {
         filterPolicy !== "all" && { policy: filterPolicy }),
       ...(tab === "books" && filterRoom !== "all" && { room: filterRoom }),
       ...(tab === "books" && filterArea !== "all" && { area: filterArea }),
+      ...(tab === "borrowers" && filterType !== "all" && { type: filterType }),
     });
     try {
       const res = await fetch(`/api/admin?${params}`);
@@ -1445,12 +1789,10 @@ export default function AdminPage() {
       return next;
     });
   }
-
   function toggleSelectAll() {
     if (selected.size === rows.length) setSelected(new Set());
     else setSelected(new Set(rows.map((r) => r.tempCopyCode)));
   }
-
   function exitSelectionMode() {
     setSelectionMode(false);
     setSelected(new Set());
@@ -1764,6 +2106,7 @@ export default function AdminPage() {
     loans: [
       ["loanID", "מזהה"],
       ["bookID", "קוד ספר"],
+      ["bookName", "שם הספר", false],
       ["borrowerID", "ת״ז"],
       ["borrower", "שם שואל", false],
       ["loanDate", "תאריך השאלה"],
@@ -1772,6 +2115,7 @@ export default function AdminPage() {
     ],
     books: [
       ["", "", false],
+      ["serialNum", "מס'", true],
       ["tempCopyCode", "קוד ספר"],
       ["bookName", "שם הספר"],
       ["authorName", "מחבר"],
@@ -1781,10 +2125,11 @@ export default function AdminPage() {
       ["", "", false],
     ],
     borrowers: [
+      ["", "", false],
       ["borrowerID", "ת״ז"],
       ["firstName", "שם פרטי"],
       ["lastName", "שם משפחה"],
-      ["shiur", "שיעור", false],
+      ["shiur", "שיעור"],
       ["phone", "טלפון"],
       ["isBlocked", "חסום"],
       ["activeLoansCount", "מושאלים"],
@@ -1853,7 +2198,6 @@ export default function AdminPage() {
           }}
         />
       )}
-
       {selectionMode && selected.size > 0 && (
         <BulkBar
           selected={selected}
@@ -2142,6 +2486,9 @@ export default function AdminPage() {
                         >
                           {r.bookID}
                         </td>
+                        <td style={td({ fontWeight: 500 })}>
+                          {r.bookName || "—"}
+                        </td>
                         <td style={td({ color: T.text3 })}>{r.borrowerID}</td>
                         <td style={td({ fontWeight: 500 })}>{name}</td>
                         <td style={td()}>{r.loanDate}</td>
@@ -2196,86 +2543,20 @@ export default function AdminPage() {
 
                 {tab === "borrowers" &&
                   rows.map((r) => (
-                    <tr
+                    <BorrowerRow
                       key={r.borrowerID}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = "#fafbff")
+                      r={r}
+                      s={s}
+                      td={td}
+                      onEdit={setBorrowerModal}
+                      onDelete={(r) =>
+                        setConfirmDialog({
+                          message: `למחוק את ${r.firstName} ${r.lastName}?`,
+                          danger: true,
+                          onConfirm: () => handleDeleteBorrower(r.borrowerID),
+                        })
                       }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "")
-                      }
-                    >
-                      <td
-                        style={td({
-                          fontFamily: "monospace",
-                          fontSize: 12,
-                          color: T.text3,
-                        })}
-                      >
-                        {r.borrowerID}
-                      </td>
-                      <td style={td()}>{r.firstName || "—"}</td>
-                      <td style={td({ fontWeight: 500 })}>
-                        {r.lastName || "—"}
-                      </td>
-                      <td style={td({ color: T.text3 })}>{r.shiur || "—"}</td>
-                      <td style={td({ color: T.text3 })}>{r.phone || "—"}</td>
-                      <td style={td()}>
-                        {r.isBlocked === "TRUE" && (
-                          <span
-                            style={{
-                              padding: "3px 10px",
-                              borderRadius: 999,
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              background: T.redLt,
-                              color: T.red,
-                            }}
-                          >
-                            חסום
-                          </span>
-                        )}
-                      </td>
-                      <td style={td({ textAlign: "center" })}>
-                        {r.activeLoansCount > 0 ? (
-                          <span
-                            style={{
-                              padding: "3px 10px",
-                              borderRadius: 999,
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              background: T.redLt,
-                              color: T.red,
-                            }}
-                          >
-                            {r.activeLoansCount}
-                          </span>
-                        ) : (
-                          <span style={{ color: T.text3 }}>0</span>
-                        )}
-                      </td>
-                      <td style={td()}>
-                        <button
-                          style={s.btnSmall(T.accent)}
-                          onClick={() => setBorrowerModal(r)}
-                        >
-                          ערוך
-                        </button>
-                        <button
-                          style={s.btnSmall(T.red)}
-                          onClick={() =>
-                            setConfirmDialog({
-                              message: `למחוק את ${r.firstName} ${r.lastName}?`,
-                              danger: true,
-                              onConfirm: () =>
-                                handleDeleteBorrower(r.borrowerID),
-                            })
-                          }
-                        >
-                          מחק
-                        </button>
-                      </td>
-                    </tr>
+                    />
                   ))}
               </tbody>
             </table>
@@ -2283,6 +2564,13 @@ export default function AdminPage() {
 
           {totalPages > 1 && (
             <div style={s.pagination}>
+              <button
+                style={s.btnGhost}
+                disabled={page === 1}
+                onClick={() => setPage(1)}
+              >
+                ⏮
+              </button>
               <button
                 style={s.btnGhost}
                 disabled={page === 1}
@@ -2299,6 +2587,13 @@ export default function AdminPage() {
                 onClick={() => setPage((p) => p + 1)}
               >
                 הבא ←
+              </button>
+              <button
+                style={s.btnGhost}
+                disabled={page === totalPages}
+                onClick={() => setPage(totalPages)}
+              >
+                ⏭
               </button>
             </div>
           )}

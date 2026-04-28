@@ -29,9 +29,13 @@ export async function GET(request) {
         (l) => !l.ReturnAtDate || l.ReturnAtDate.trim() === "",
       );
       const activeBooks = books.filter((b) => b.isActive !== "FALSE");
-      const borrowedCount = activeBooks.filter((b) =>
-        b.active_loan_id?.trim(),
-      ).length;
+      const allLoansForStats = getAllLoans();
+      const borrowedBookIDs = new Set(
+        allLoansForStats
+          .filter((l) => !l.ReturnAtDate || l.ReturnAtDate.trim() === "")
+          .map((l) => l.bookID),
+      );
+      const borrowedCount = borrowedBookIDs.size;
       return NextResponse.json({
         totalBooks: activeBooks.length,
         totalBorrowers: borrowers.length,
@@ -44,16 +48,21 @@ export async function GET(request) {
 
     if (view === "loans") {
       const allLoans = getAllLoans();
+      const booksMap = Object.fromEntries(
+        getAllBooks().map((b) => [b.tempCopyCode, b]),
+      );
       let loans = allLoans
         .filter((l) => !l.ReturnAtDate || l.ReturnAtDate.trim() === "")
         .map((loan) => ({
           ...loan,
           borrower: getBorrowerById(loan.borrowerID) ?? null,
+          bookName: booksMap[loan.bookID]?.bookName || null,
         }));
       if (q)
         loans = loans.filter(
           (l) =>
             (l.bookID || "").toLowerCase().includes(q.toLowerCase()) ||
+            (l.bookName || "").toLowerCase().includes(q.toLowerCase()) ||
             (l.borrowerID || "").includes(q) ||
             (l.borrower?.firstName || "")
               .toLowerCase()
@@ -70,7 +79,24 @@ export async function GET(request) {
     }
 
     if (view === "books") {
-      let books = searchBooksAdmin({ q, status, policy, room, area });
+      const allLoans = getAllLoans();
+      const borrowedIDs = new Set(
+        allLoans
+          .filter((l) => !l.ReturnAtDate || l.ReturnAtDate.trim() === "")
+          .map((l) => l.bookID),
+      );
+      let books = searchBooksAdmin({
+        q,
+        status,
+        policy,
+        room,
+        area,
+        borrowedIDs,
+      });
+      books = books.map((b) => ({
+        ...b,
+        isBorrowed: borrowedIDs.has(String(b.tempCopyCode)),
+      }));
       books = sortRows(books, sortBy, sortDir);
       return NextResponse.json({
         books: paginate(books, page, limit),
@@ -99,6 +125,9 @@ export async function GET(request) {
             (b.lastName || "").toLowerCase().includes(q.toLowerCase()) ||
             (b.shiur || "").toLowerCase().includes(q.toLowerCase()),
         );
+      const type = searchParams.get("type");
+      if (type && type !== "all")
+        borrowers = borrowers.filter((b) => b.type === type);
       borrowers = sortRows(borrowers, sortBy, sortDir);
       return NextResponse.json({
         borrowers: paginate(borrowers, page, limit),
@@ -116,8 +145,27 @@ export async function GET(request) {
 function sortRows(rows, sortBy, sortDir) {
   if (!sortBy) return rows;
   return [...rows].sort((a, b) => {
-    const av = (a[sortBy] || "").toString().toLowerCase();
-    const bv = (b[sortBy] || "").toString().toLowerCase();
+    const av = (a[sortBy] || "").toString();
+    const bv = (b[sortBy] || "").toString();
+
+    // מיון תאריך DD/MM/YYYY
+    const dateRe = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const am = av.match(dateRe);
+    const bm = bv.match(dateRe);
+    if (am && bm) {
+      const ad = new Date(`${am[3]}-${am[2]}-${am[1]}`);
+      const bd = new Date(`${bm[3]}-${bm[2]}-${bm[1]}`);
+      return sortDir === "desc" ? bd - ad : ad - bd;
+    }
+
+    // מיון מספרי
+    const an = parseFloat(av);
+    const bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) {
+      return sortDir === "desc" ? bn - an : an - bn;
+    }
+
+    // מיון טקסטואלי
     return sortDir === "desc"
       ? bv.localeCompare(av, "he")
       : av.localeCompare(bv, "he");

@@ -7,37 +7,38 @@ import { T } from "@/lib/theme";
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { responsive, isMobile } = useResponsive();
+  const { responsive } = useResponsive();
   const inputRef = useRef(null);
+  const codeRef = useRef(null);
 
   const [borrowerID, setBorrowerID] = useState("");
   const [borrower, setBorrower] = useState(null);
   const [borrowerError, setBorrowerError] = useState("");
-
   const [currentCode, setCurrentCode] = useState("");
   const [bookItems, setBookItems] = useState([]);
   const [bookError, setBookError] = useState("");
-  const [lastAdded, setLastAdded] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState(null);
+  const [addingMore, setAddingMore] = useState(false);
 
-  // מילוי שדה הקוד מה-URL בטעינה
   useEffect(() => {
     const code = searchParams.get("copyCode") || searchParams.get("serialNum");
     if (code) setCurrentCode(code);
   }, []);
 
-  // פוקוס אוטומטי על שדה הספר אחרי אימות שואל
   useEffect(() => {
     if (borrower) inputRef.current?.focus();
   }, [borrower]);
 
-  // הרצת בדיקת ספר אחרי אימות תלמיד
   useEffect(() => {
     const code = searchParams.get("copyCode") || searchParams.get("serialNum");
     if (code && borrower) verifyBook(code);
   }, [borrower]);
+
+  useEffect(() => {
+    if (addingMore) codeRef.current?.focus();
+  }, [addingMore]);
 
   async function verifyBorrower() {
     if (!borrowerID.trim()) return;
@@ -53,12 +54,12 @@ function CheckoutContent() {
         return;
       }
       if (data.isBlocked === "TRUE") {
-        setBorrowerError("תלמיד זה חסום במערכת");
+        setBorrowerError("שואל זה חסום במערכת");
         return;
       }
       setBorrower(data);
     } catch {
-      setBorrowerError("שגיאה בחיפוש תלמיד");
+      setBorrowerError("שגיאה בחיפוש שואל");
     }
   }
 
@@ -66,7 +67,6 @@ function CheckoutContent() {
     const id = (code ?? currentCode).trim();
     if (!id) return;
     setBookError("");
-    setLastAdded(null);
     if (bookItems.find((i) => i.id === id)) {
       setBookError("קוד ספר זה כבר נוסף");
       return;
@@ -91,9 +91,8 @@ function CheckoutContent() {
         ...prev,
         { id, bookName: data.bookName, authorName: data.authorName },
       ]);
-      setLastAdded(data.bookName);
       setCurrentCode("");
-      setTimeout(() => setLastAdded(null), 2500);
+      setAddingMore(false);
     } catch {
       setBookError("שגיאה בחיפוש ספר");
     } finally {
@@ -133,6 +132,9 @@ function CheckoutContent() {
         flexDirection: "column",
         gap: 20,
         fontFamily: T.fontBody,
+        maxWidth: 560,
+        margin: "0 auto",
+        width: "100%",
       },
       title: {
         fontFamily: T.fontDisplay,
@@ -143,12 +145,6 @@ function CheckoutContent() {
         marginBottom: 4,
       },
       subtitle: { fontSize: 13, color: T.text3 },
-      split: {
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-        gap: 16,
-        alignItems: "start",
-      },
       card: {
         background: T.surface,
         border: `1px solid ${T.border}`,
@@ -188,6 +184,30 @@ function CheckoutContent() {
         whiteSpace: "nowrap",
         fontFamily: T.fontBody,
       }),
+      btnFull: (color, disabled) => ({
+        width: "100%",
+        padding: "12px",
+        borderRadius: T.radiusSm,
+        background: disabled ? T.text3 : color,
+        color: "#fff",
+        border: "none",
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontFamily: T.fontBody,
+      }),
+      btnOutline: (color) => ({
+        width: "100%",
+        padding: "12px",
+        borderRadius: T.radiusSm,
+        background: "transparent",
+        color,
+        border: `2px solid ${color}`,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: T.fontBody,
+      }),
       alertBox: {
         marginTop: 10,
         padding: "10px 14px",
@@ -198,31 +218,19 @@ function CheckoutContent() {
         color: T.red,
         border: `1px solid ${T.redBorder}`,
       },
-      successBox: {
-        marginTop: 10,
-        padding: "10px 14px",
-        borderRadius: T.radiusSm,
-        fontSize: 13,
-        fontWeight: 500,
-        background: T.greenLt,
-        color: T.green,
-        border: `1px solid ${T.greenBorder}`,
-      },
       borrowerBox: {
         marginTop: 12,
         padding: "11px 14px",
         background: T.accentLt,
         borderRadius: T.radiusSm,
-        border: `1px solid #bfdbfe`,
+        border: "1px solid #bfdbfe",
       },
       listCard: {
         background: T.surface,
         border: `1px solid ${T.border}`,
         borderRadius: T.radius,
         boxShadow: T.shadowSm,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 200,
+        overflow: "hidden",
       },
       listHeader: {
         padding: "14px 18px",
@@ -240,18 +248,7 @@ function CheckoutContent() {
         borderRadius: 999,
         padding: "2px 10px",
       },
-      listBody: {
-        flex: 1,
-        padding: "8px 0",
-        overflowY: "auto",
-        maxHeight: 320,
-      },
-      listEmpty: {
-        color: T.text3,
-        fontSize: 13,
-        textAlign: "center",
-        padding: "40px 20px",
-      },
+      listBody: { padding: "8px 0", overflowY: "auto", maxHeight: 280 },
       listItem: {
         display: "flex",
         alignItems: "center",
@@ -270,19 +267,16 @@ function CheckoutContent() {
         padding: "0 4px",
         lineHeight: 1,
       },
-      listFooter: { padding: "14px 18px", borderTop: `1px solid ${T.border}` },
-      confirmBtn: (disabled) => ({
-        width: "100%",
-        padding: "11px",
-        borderRadius: T.radiusSm,
-        background: disabled ? T.text3 : T.green,
-        color: "#fff",
-        border: "none",
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-        fontFamily: T.fontBody,
-      }),
+      actionsCard: {
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: T.radius,
+        padding: 16,
+        boxShadow: T.shadowSm,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      },
       successAlert: {
         padding: "12px 16px",
         borderRadius: T.radiusSm,
@@ -301,7 +295,7 @@ function CheckoutContent() {
         marginBottom: 6,
       },
     }),
-    [responsive, isMobile],
+    [responsive],
   );
 
   if (result)
@@ -334,7 +328,7 @@ function CheckoutContent() {
                   marginBottom: 6,
                 }}
               >
-                ⚠️ לא הושאלו:
+                לא הושאלו:
               </div>
               {result.errors.map((e, i) => (
                 <div
@@ -360,15 +354,17 @@ function CheckoutContent() {
       </div>
     );
 
+  const hasBooks = bookItems.length > 0;
+
   return (
     <div style={s.page}>
       <div>
         <h1 style={s.title}>השאלת ספר</h1>
-        <p style={s.subtitle}>אמת תלמיד, הזן קודי ספרים ואשר</p>
+        <p style={s.subtitle}>מלא תעודת זהות, הזן קודי ספרים ואשר</p>
       </div>
 
       <div style={s.card}>
-        <label style={s.label}>מספר ת&quot;ז תלמיד</label>
+        <label style={s.label}>מספר ת&quot;ז שואל</label>
         <div style={s.row}>
           <input
             style={s.input(false)}
@@ -398,98 +394,153 @@ function CheckoutContent() {
               ת&quot;ז: {borrower.borrowerID}
               {borrower.shiur && ` · שיעור ${borrower.shiur}`}
             </div>
+            <div
+              style={{ fontSize: 12, marginTop: 6, display: "flex", gap: 12 }}
+            >
+              <span
+                style={{
+                  color: borrower.activeLoans?.length > 0 ? T.red : T.green,
+                  fontWeight: 600,
+                }}
+              >
+                📚 {borrower.activeLoans?.length || 0} ספרים מושאלים
+              </span>
+              <span style={{ color: T.accent, fontWeight: 600 }}>
+                ✓ יכול לשאול עוד{" "}
+                {Math.max(0, 10 - (borrower.activeLoans?.length || 0))}
+              </span>
+            </div>
           </div>
         )}
       </div>
 
-      <div
-        style={{
-          ...s.split,
-          opacity: borrower ? 1 : 0.4,
-          pointerEvents: borrower ? "auto" : "none",
-        }}
-      >
+      {borrower && !hasBooks && (
         <div style={s.card}>
           <label style={s.label}>קוד ספר</label>
           <div style={s.row}>
             <input
               ref={inputRef}
-              style={s.input(!borrower)}
+              style={s.input(false)}
               placeholder="הזן קוד ספר ולחץ Enter..."
               value={currentCode}
               onChange={(e) => {
                 setCurrentCode(e.target.value);
                 setBookError("");
-                setLastAdded(null);
               }}
               onKeyDown={(e) => e.key === "Enter" && verifyBook()}
               onFocus={(e) => (e.target.style.borderColor = T.accent)}
               onBlur={(e) => (e.target.style.borderColor = T.border)}
-              disabled={!borrower}
             />
             <button
-              style={s.btn(T.accent, !borrower || loading)}
+              style={s.btn(T.accent, loading)}
               onClick={() => verifyBook()}
-              disabled={!borrower || loading}
+              disabled={loading}
             >
               {loading ? "..." : "הוסף"}
             </button>
           </div>
           {bookError && <div style={s.alertBox}>{bookError}</div>}
-          {lastAdded && <div style={s.successBox}>✓ נוסף: {lastAdded}</div>}
-          <div style={{ marginTop: 14, fontSize: 12, color: T.text3 }}>
-            לחץ Enter אחרי כל קוד — השדה יתרוקן אוטומטית
-          </div>
         </div>
+      )}
 
+      {hasBooks && (
         <div style={s.listCard}>
           <div style={s.listHeader}>
             <span style={s.listTitle}>ספרים להשאלה</span>
-            {bookItems.length > 0 && (
-              <span style={s.listCount}>{bookItems.length}</span>
-            )}
+            <span style={s.listCount}>{bookItems.length}</span>
           </div>
+          {bookError && (
+            <div style={{ ...s.alertBox, margin: "10px 18px 0" }}>
+              {bookError}
+            </div>
+          )}
           <div style={s.listBody}>
-            {bookItems.length === 0 ? (
-              <div style={s.listEmpty}>הספרים שתוסיף יופיעו כאן</div>
-            ) : (
-              bookItems.map((item) => (
-                <div key={item.id} style={s.listItem}>
-                  <div>
-                    <div style={s.listName}>{item.bookName}</div>
-                    <div style={s.listAuthor}>
-                      {item.authorName} · {item.id}
-                    </div>
+            {bookItems.map((item) => (
+              <div key={item.id} style={s.listItem}>
+                <div>
+                  <div style={s.listName}>{item.bookName}</div>
+                  <div style={s.listAuthor}>
+                    {item.authorName} · {item.id}
                   </div>
-                  <button
-                    style={s.listRemove}
-                    onClick={() =>
-                      setBookItems((prev) =>
-                        prev.filter((i) => i.id !== item.id),
-                      )
-                    }
-                  >
-                    ×
-                  </button>
                 </div>
-              ))
-            )}
-          </div>
-          <div style={s.listFooter}>
-            <button
-              style={s.confirmBtn(
-                !borrower || bookItems.length === 0 || confirming,
-              )}
-              disabled={!borrower || bookItems.length === 0 || confirming}
-              onClick={handleConfirm}
-            >
-              {confirming
-                ? "מעבד..."
-                : `✓ אשר השאלה${bookItems.length > 0 ? ` (${bookItems.length})` : ""}`}
-            </button>
+                <button
+                  style={s.listRemove}
+                  onClick={() => {
+                    setBookItems((prev) =>
+                      prev.filter((i) => i.id !== item.id),
+                    );
+                    setBookError("");
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
+
+      {hasBooks && (
+        <div style={s.actionsCard}>
+          {addingMore ? (
+            <>
+              <label style={s.label}>קוד ספר נוסף</label>
+              <div style={s.row}>
+                <input
+                  ref={codeRef}
+                  style={s.input(false)}
+                  placeholder="הזן קוד ספר נוסף ולחץ Enter..."
+                  value={currentCode}
+                  onChange={(e) => {
+                    setCurrentCode(e.target.value);
+                    setBookError("");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && verifyBook()}
+                  onFocus={(e) => (e.target.style.borderColor = T.accent)}
+                  onBlur={(e) => (e.target.style.borderColor = T.border)}
+                />
+                <button
+                  style={s.btn(T.accent, loading)}
+                  onClick={() => verifyBook()}
+                  disabled={loading}
+                >
+                  {loading ? "..." : "הוסף"}
+                </button>
+                <button
+                  style={s.btn(T.text2)}
+                  onClick={() => {
+                    setAddingMore(false);
+                    setCurrentCode("");
+                    setBookError("");
+                  }}
+                >
+                  ביטול
+                </button>
+              </div>
+              {bookError && <div style={s.alertBox}>{bookError}</div>}
+            </>
+          ) : (
+            <>
+              <button
+                style={s.btnFull(T.green, confirming)}
+                disabled={confirming}
+                onClick={handleConfirm}
+              >
+                {confirming ? "מעבד..." : `✓ אשר השאלה (${bookItems.length})`}
+              </button>
+              <button
+                style={s.btnOutline(T.accent)}
+                onClick={() => {
+                  setAddingMore(true);
+                  setBookError("");
+                }}
+              >
+                ➕ הוסף ספר נוסף
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

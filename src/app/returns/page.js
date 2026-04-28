@@ -77,18 +77,19 @@ function SmsPopup({ messages, onClose }) {
 function ReturnsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { responsive, isMobile } = useResponsive();
+  const { responsive } = useResponsive();
   const inputRef = useRef(null);
+  const codeRef = useRef(null);
   const didInit = useRef(false);
 
   const [currentCode, setCurrentCode] = useState("");
   const [returnItems, setReturnItems] = useState([]);
   const [error, setError] = useState("");
-  const [lastAdded, setLastAdded] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState(null);
   const [smsMessages, setSmsMessages] = useState(null);
+  const [addingMore, setAddingMore] = useState(false);
 
   useEffect(() => {
     if (didInit.current) return;
@@ -98,11 +99,14 @@ function ReturnsContent() {
     if (sn) verifyBook(sn);
   }, []);
 
+  useEffect(() => {
+    if (addingMore) codeRef.current?.focus();
+  }, [addingMore]);
+
   async function verifyBook(code) {
     const id = (code ?? currentCode).trim();
     if (!id) return;
     setError("");
-    setLastAdded(null);
     if (returnItems.find((i) => i.id === id)) {
       setError("קוד ספר זה כבר ברשימה");
       return;
@@ -128,9 +132,8 @@ function ReturnsContent() {
           activeLoan: data.activeLoan,
         },
       ]);
-      setLastAdded(data.bookName);
       setCurrentCode("");
-      setTimeout(() => setLastAdded(null), 2500);
+      setAddingMore(false);
     } catch {
       setError("שגיאה בחיפוש ספר");
     } finally {
@@ -170,6 +173,9 @@ function ReturnsContent() {
         flexDirection: "column",
         gap: 20,
         fontFamily: T.fontBody,
+        maxWidth: 560,
+        margin: "0 auto",
+        width: "100%",
       },
       title: {
         fontFamily: T.fontDisplay,
@@ -180,12 +186,6 @@ function ReturnsContent() {
         marginBottom: 4,
       },
       subtitle: { fontSize: 13, color: T.text3 },
-      split: {
-        display: "grid",
-        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-        gap: 16,
-        alignItems: "start",
-      },
       card: {
         background: T.surface,
         border: `1px solid ${T.border}`,
@@ -224,6 +224,30 @@ function ReturnsContent() {
         whiteSpace: "nowrap",
         fontFamily: T.fontBody,
       }),
+      btnFull: (color, disabled) => ({
+        width: "100%",
+        padding: "12px",
+        borderRadius: T.radiusSm,
+        background: disabled ? T.text3 : color,
+        color: "#fff",
+        border: "none",
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontFamily: T.fontBody,
+      }),
+      btnOutline: (color) => ({
+        width: "100%",
+        padding: "12px",
+        borderRadius: T.radiusSm,
+        background: "transparent",
+        color,
+        border: `2px solid ${color}`,
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: "pointer",
+        fontFamily: T.fontBody,
+      }),
       alertBox: {
         marginTop: 10,
         padding: "10px 14px",
@@ -234,24 +258,12 @@ function ReturnsContent() {
         color: T.red,
         border: `1px solid ${T.redBorder}`,
       },
-      successBox: {
-        marginTop: 10,
-        padding: "10px 14px",
-        borderRadius: T.radiusSm,
-        fontSize: 13,
-        fontWeight: 500,
-        background: T.greenLt,
-        color: T.green,
-        border: `1px solid ${T.greenBorder}`,
-      },
       listCard: {
         background: T.surface,
         border: `1px solid ${T.border}`,
         borderRadius: T.radius,
         boxShadow: T.shadowSm,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 200,
+        overflow: "hidden",
       },
       listHeader: {
         padding: "14px 18px",
@@ -269,18 +281,7 @@ function ReturnsContent() {
         borderRadius: 999,
         padding: "2px 10px",
       },
-      listBody: {
-        flex: 1,
-        padding: "8px 0",
-        overflowY: "auto",
-        maxHeight: 320,
-      },
-      listEmpty: {
-        color: T.text3,
-        fontSize: 13,
-        textAlign: "center",
-        padding: "40px 20px",
-      },
+      listBody: { padding: "8px 0", overflowY: "auto", maxHeight: 280 },
       listItem: {
         display: "flex",
         alignItems: "center",
@@ -299,19 +300,16 @@ function ReturnsContent() {
         padding: "0 4px",
         lineHeight: 1,
       },
-      listFooter: { padding: "14px 18px", borderTop: `1px solid ${T.border}` },
-      confirmBtn: (disabled) => ({
-        width: "100%",
-        padding: "11px",
-        borderRadius: T.radiusSm,
-        background: disabled ? T.text3 : T.green,
-        color: "#fff",
-        border: "none",
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-        fontFamily: T.fontBody,
-      }),
+      actionsCard: {
+        background: T.surface,
+        border: `1px solid ${T.border}`,
+        borderRadius: T.radius,
+        padding: 16,
+        boxShadow: T.shadowSm,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      },
       successAlert: {
         padding: "12px 16px",
         borderRadius: T.radiusSm,
@@ -329,7 +327,7 @@ function ReturnsContent() {
         marginBottom: 8,
       }),
     }),
-    [responsive, isMobile],
+    [responsive],
   );
 
   if (result) {
@@ -380,6 +378,8 @@ function ReturnsContent() {
     );
   }
 
+  const hasItems = returnItems.length > 0;
+
   return (
     <div style={s.page}>
       {smsMessages && (
@@ -387,10 +387,10 @@ function ReturnsContent() {
       )}
       <div>
         <h1 style={s.title}>החזרת ספר</h1>
-        <p style={s.subtitle}>הזן קודי ספרים ואשר החזרה</p>
+        <p style={s.subtitle}>הזן קוד ספר ואשר החזרה</p>
       </div>
 
-      <div style={s.split}>
+      {!hasItems && (
         <div style={s.card}>
           <label style={s.label}>קוד ספר</label>
           <div style={s.row}>
@@ -402,7 +402,6 @@ function ReturnsContent() {
               onChange={(e) => {
                 setCurrentCode(e.target.value);
                 setError("");
-                setLastAdded(null);
               }}
               onKeyDown={(e) => e.key === "Enter" && verifyBook()}
               onFocus={(e) => (e.target.style.borderColor = T.accent)}
@@ -417,58 +416,107 @@ function ReturnsContent() {
             </button>
           </div>
           {error && <div style={s.alertBox}>{error}</div>}
-          {lastAdded && <div style={s.successBox}>✓ נוסף: {lastAdded}</div>}
-          <div style={{ marginTop: 14, fontSize: 12, color: T.text3 }}>
-            לחץ Enter אחרי כל קוד — השדה יתרוקן אוטומטית
-          </div>
         </div>
+      )}
 
+      {hasItems && (
         <div style={s.listCard}>
           <div style={s.listHeader}>
             <span style={s.listTitle}>ספרים להחזרה</span>
-            {returnItems.length > 0 && (
-              <span style={s.listCount}>{returnItems.length}</span>
-            )}
+            <span style={s.listCount}>{returnItems.length}</span>
           </div>
+          {error && (
+            <div style={{ ...s.alertBox, margin: "10px 18px 0" }}>{error}</div>
+          )}
           <div style={s.listBody}>
-            {returnItems.length === 0 ? (
-              <div style={s.listEmpty}>הספרים שתוסיף יופיעו כאן</div>
-            ) : (
-              returnItems.map((item) => (
-                <div key={item.id} style={s.listItem}>
-                  <div>
-                    <div style={s.listName}>{item.bookName}</div>
-                    <div style={s.listMeta}>
-                      {item.authorName} · {item.id}
-                    </div>
+            {returnItems.map((item) => (
+              <div key={item.id} style={s.listItem}>
+                <div>
+                  <div style={s.listName}>{item.bookName}</div>
+                  <div style={s.listMeta}>
+                    {item.authorName} · {item.id}
                   </div>
-                  <button
-                    style={s.listRemove}
-                    onClick={() =>
-                      setReturnItems((prev) =>
-                        prev.filter((i) => i.id !== item.id),
-                      )
-                    }
-                  >
-                    ×
-                  </button>
                 </div>
-              ))
-            )}
-          </div>
-          <div style={s.listFooter}>
-            <button
-              style={s.confirmBtn(returnItems.length === 0 || confirming)}
-              disabled={returnItems.length === 0 || confirming}
-              onClick={handleConfirm}
-            >
-              {confirming
-                ? "מעבד..."
-                : `↩️ אשר החזרה${returnItems.length > 0 ? ` (${returnItems.length})` : ""}`}
-            </button>
+                <button
+                  style={s.listRemove}
+                  onClick={() => {
+                    setReturnItems((prev) =>
+                      prev.filter((i) => i.id !== item.id),
+                    );
+                    setError("");
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
+
+      {hasItems && (
+        <div style={s.actionsCard}>
+          {addingMore ? (
+            <>
+              <label style={s.label}>קוד ספר נוסף</label>
+              <div style={s.row}>
+                <input
+                  ref={codeRef}
+                  style={s.input}
+                  placeholder="הזן קוד ספר נוסף ולחץ Enter..."
+                  value={currentCode}
+                  onChange={(e) => {
+                    setCurrentCode(e.target.value);
+                    setError("");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && verifyBook()}
+                  onFocus={(e) => (e.target.style.borderColor = T.accent)}
+                  onBlur={(e) => (e.target.style.borderColor = T.border)}
+                />
+                <button
+                  style={s.btn(T.accent, loading)}
+                  onClick={() => verifyBook()}
+                  disabled={loading}
+                >
+                  {loading ? "..." : "הוסף"}
+                </button>
+                <button
+                  style={s.btn(T.text2)}
+                  onClick={() => {
+                    setAddingMore(false);
+                    setCurrentCode("");
+                    setError("");
+                  }}
+                >
+                  ביטול
+                </button>
+              </div>
+              {error && <div style={s.alertBox}>{error}</div>}
+            </>
+          ) : (
+            <>
+              <button
+                style={s.btnFull(T.green, confirming)}
+                disabled={confirming}
+                onClick={handleConfirm}
+              >
+                {confirming
+                  ? "מעבד..."
+                  : `↩️ אשר החזרה (${returnItems.length})`}
+              </button>
+              <button
+                style={s.btnOutline(T.accent)}
+                onClick={() => {
+                  setAddingMore(true);
+                  setError("");
+                }}
+              >
+                ➕ הוסף ספר נוסף
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

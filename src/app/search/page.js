@@ -1,8 +1,25 @@
 "use client";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
 
+const AREAS_LIBRARY = [
+  "ספרייה עגולה",
+  "ספריית הוראה",
+  "ספרייה מלבנית",
+  "ספריית ילדים",
+  "ספריית אנגלית",
+];
+const AREAS_BM = [
+  "משולש ימין קדמי",
+  "משולש ימין אחורי",
+  "משולש שמאל קדמי",
+  "משולש שמאל אחורי",
+  "משולש כניסה",
+  "משולש כניסה - ספריית תפילה על שם יהלומי",
+];
+
+// ── Notify Me Popup ────────────────────────────────────────
 function NotifyPopup({ book, onClose }) {
   const [tz, setTz] = useState("");
   const [msg, setMsg] = useState("");
@@ -175,14 +192,26 @@ function NotifyPopup({ book, onClose }) {
   );
 }
 
+// ── Accordion content ──────────────────────────────────────
 function AccordionContent({ book, onNotify }) {
+  const [fullBook, setFullBook] = useState(null);
   const policy = (book.loan_policy || "").trim();
   const borrowed = book.isBorrowed;
+
+  useEffect(() => {
+    fetch(`/api/books/${encodeURIComponent(book.tempCopyCode)}`)
+      .then((r) => r.json())
+      .then(setFullBook)
+      .catch(() => {});
+  }, [book.tempCopyCode]);
+
+  const b = fullBook || book;
 
   const s = {
     wrap: {
       padding: "14px 20px 16px",
       background: T.surface,
+      borderTop: `1px solid ${T.borderSoft}`,
       borderBottom: `2px solid ${T.border}`,
     },
     grid: {
@@ -226,43 +255,54 @@ function AccordionContent({ book, onNotify }) {
   return (
     <div style={s.wrap} onClick={(e) => e.stopPropagation()}>
       <div style={s.grid}>
-        {book.description && (
-          <div style={{ gridColumn: "1 / -1" }}>
+        {b.description && (
+          <div style={{ gridColumn: "1/-1" }}>
             <div style={s.label}>תיאור</div>
-            <div style={s.text}>{book.description}</div>
+            <div style={s.text}>{b.description}</div>
           </div>
         )}
-        {book.notes && (
-          <div style={{ gridColumn: "1 / -1" }}>
+        {b.notes && (
+          <div style={{ gridColumn: "1/-1" }}>
             <div style={s.label}>הערות</div>
-            <div style={s.text}>{book.notes}</div>
+            <div style={s.text}>{b.notes}</div>
           </div>
         )}
         <div>
           <div style={s.label}>קטגוריה</div>
-          <div style={s.value}>{book.category || "—"}</div>
+          <div style={s.value}>{b.category || "—"}</div>
         </div>
         <div>
           <div style={s.label}>מדיניות</div>
           <div style={s.value}>{policy || "רגיל"}</div>
         </div>
-        {book.activeLoan?.dueDate && (
+        {b.activeLoan?.dueDate && (
           <div>
             <div style={s.label}>להחזיר עד</div>
             <div style={{ ...s.value, color: T.red }}>
-              {book.activeLoan.dueDate}
+              {b.activeLoan.dueDate}
             </div>
           </div>
         )}
       </div>
-
+      {b.isBorrowed && b.activeLoan?.borrower && (
+        <div style={{ gridColumn: "1/-1", marginBottom: 4 }}>
+          <div style={s.label}>מושאל אצל</div>
+          <div style={s.value}>
+            {b.activeLoan.borrower.firstName} {b.activeLoan.borrower.lastName}
+          </div>
+          {b.activeLoan.borrower.phone && (
+            <div style={{ ...s.value, fontSize: 12, color: T.text2 }}>
+              📞 {b.activeLoan.borrower.phone}
+            </div>
+          )}
+        </div>
+      )}
       <div style={s.divider} />
-
       <div style={s.actions}>
         {!borrowed && policy !== "לעיון במקום בלבד" && (
           <>
             <a
-              href={`/checkout?copyCode=${book.tempCopyCode}`}
+              href={`/checkout?copyCode=${b.tempCopyCode}`}
               style={s.btnSm(T.green)}
             >
               📖 השאל
@@ -275,14 +315,14 @@ function AccordionContent({ book, onNotify }) {
         {borrowed && (
           <>
             <a
-              href={`/returns?copyCode=${book.tempCopyCode}`}
+              href={`/returns?copyCode=${b.tempCopyCode}`}
               style={s.btnSm(T.accent)}
             >
               ↩️ החזר
             </a>
             <button
               style={s.btnSm(T.yellow, T.yellowLt)}
-              onClick={() => onNotify(book)}
+              onClick={() => onNotify(b)}
             >
               🔔 הודע לי
             </button>
@@ -296,6 +336,7 @@ function AccordionContent({ book, onNotify }) {
   );
 }
 
+// ── Book row ───────────────────────────────────────────────
 function BookRow({ book, expandedId, onToggle, onNotify }) {
   const isExpanded = expandedId === book.tempCopyCode;
   const borrowed = book.isBorrowed;
@@ -411,37 +452,31 @@ function BookRow({ book, expandedId, onToggle, onNotify }) {
             <div
               style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}
             >
-              {!borrowed && policy !== "לעיון במקום בלבד" && (
-                <>
-                  {actionBtn(
-                    T.green,
-                    null,
-                    "📖 השאל",
-                    `/checkout?copyCode=${book.tempCopyCode}`,
-                    null,
-                  )}
-                  {actionBtn(T.accent, T.accentLt, "🛒 סל", null, () => {})}
-                </>
-              )}
-              {borrowed && (
-                <>
-                  {actionBtn(
-                    T.accent,
-                    null,
-                    "↩️ החזר",
-                    `/returns?copyCode=${book.tempCopyCode}`,
-                    null,
-                  )}
-                  {actionBtn(T.yellow, T.yellowLt, "🔔", null, () =>
-                    onNotify(book),
-                  )}
-                </>
-              )}
+              {!borrowed &&
+                policy !== "לעיון במקום בלבד" &&
+                actionBtn(
+                  T.green,
+                  null,
+                  "📖 השאל",
+                  `/checkout?copyCode=${book.tempCopyCode}`,
+                  null,
+                )}
+              {borrowed &&
+                actionBtn(
+                  T.accent,
+                  null,
+                  "↩️ החזר",
+                  `/returns?copyCode=${book.tempCopyCode}`,
+                  null,
+                )}
+              {borrowed &&
+                actionBtn(T.yellow, T.yellowLt, "🔔", null, () =>
+                  onNotify(book),
+                )}
             </div>
           )}
         </td>
       </tr>
-
       {isExpanded && (
         <tr>
           <td colSpan={7} style={{ padding: 0 }}>
@@ -453,6 +488,7 @@ function BookRow({ book, expandedId, onToggle, onNotify }) {
   );
 }
 
+// ── Main page ──────────────────────────────────────────────
 export default function SearchPage() {
   const { responsive, isMobile } = useResponsive();
   const [query, setQuery] = useState("");
@@ -462,6 +498,20 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [notifyBook, setNotifyBook] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advFields, setAdvFields] = useState({
+    bookName: "",
+    authorName: "",
+    copyCode: "",
+    category: "",
+    room: "all",
+    area: "all",
+    policy: "all",
+  });
+
+  const hasAdvancedFilters = Object.entries(advFields).some(
+    ([k, v]) => v && v !== "all" && v !== "",
+  );
 
   const s = useMemo(
     () => ({
@@ -571,27 +621,85 @@ export default function SearchPage() {
         color: T.red,
         border: `1px solid ${T.redBorder}`,
       },
+      fieldInput: {
+        padding: "7px 10px",
+        border: `1.5px solid ${T.border}`,
+        borderRadius: T.radiusSm,
+        fontSize: 13,
+        fontFamily: T.fontBody,
+        outline: "none",
+        width: "100%",
+      },
+      fieldSelect: {
+        padding: "7px 10px",
+        border: `1.5px solid ${T.border}`,
+        borderRadius: T.radiusSm,
+        fontSize: 13,
+        fontFamily: T.fontBody,
+        background: T.surface,
+        cursor: "pointer",
+        width: "100%",
+      },
+      fieldLabel: {
+        fontSize: 11.5,
+        fontWeight: 600,
+        color: T.text3,
+        marginBottom: 4,
+        display: "block",
+      },
     }),
     [responsive, isMobile],
   );
 
-  const doSearch = useCallback(async (q) => {
-    if (!q.trim()) return;
-    setLoading(true);
-    setError("");
-    setExpandedId(null);
-    try {
-      const res = await fetch(`/api/books?q=${encodeURIComponent(q)}&limit=80`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "שגיאה");
-      setResults(data.results || []);
-      setSearched(true);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const doSearch = useCallback(
+    async (q) => {
+      const isAdv = hasAdvancedFilters || showAdvanced;
+      if (!q.trim() && !isAdv) return;
+      setLoading(true);
+      setError("");
+      setExpandedId(null);
+      try {
+        let url;
+        if (isAdv) {
+          const params = new URLSearchParams({
+            advanced: "true",
+            limit: "2000",
+          });
+          if (q.trim()) params.set("q", q.trim());
+          Object.entries(advFields).forEach(([k, v]) => {
+            if (v && v !== "all") params.set(k, v);
+          });
+          url = `/api/books?${params}`;
+        } else {
+          url = `/api/books?q=${encodeURIComponent(q)}&limit=2000`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "שגיאה");
+        setResults(data.results || []);
+        setSearched(true);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [advFields, hasAdvancedFilters, showAdvanced],
+  );
+
+  const advInput = (key, placeholder) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label style={s.fieldLabel}>{placeholder}</label>
+      <input
+        style={s.fieldInput}
+        placeholder={`${placeholder}...`}
+        value={advFields[key]}
+        onChange={(e) => setAdvFields((p) => ({ ...p, [key]: e.target.value }))}
+        onFocus={(e) => (e.target.style.borderColor = T.accent)}
+        onBlur={(e) => (e.target.style.borderColor = T.border)}
+      />
+    </div>
+  );
 
   return (
     <div style={s.page}>
@@ -606,32 +714,226 @@ export default function SearchPage() {
       </div>
 
       <div style={s.searchCard}>
-        <div style={s.searchRow}>
-          <div style={s.inputWrap}>
-            <span style={s.searchIcon}>⌕</span>
-            <input
-              style={s.input}
-              placeholder="שם ספר, מחבר, קוד ספר..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
-              onFocus={(e) => (e.target.style.borderColor = T.accent)}
-              onBlur={(e) => (e.target.style.borderColor = T.border)}
-              autoFocus
-            />
+        {!showAdvanced && (
+          <div style={s.searchRow}>
+            <div style={s.inputWrap}>
+              <span style={s.searchIcon}>⌕</span>
+              <input
+                style={s.input}
+                placeholder="שם ספר, מחבר, קוד ספר..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
+                onFocus={(e) => (e.target.style.borderColor = T.accent)}
+                onBlur={(e) => (e.target.style.borderColor = T.border)}
+                autoFocus
+              />
+            </div>
+            <button
+              style={s.btnSearch}
+              onClick={() => doSearch(query)}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = T.accentDark)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = T.accent)
+              }
+              disabled={loading}
+            >
+              {loading ? "מחפש..." : "חיפוש"}
+            </button>
+            <button
+              style={{
+                padding: "9px 12px",
+                borderRadius: T.radiusSm,
+                background: "transparent",
+                color: T.text3,
+                border: `1px solid ${T.border}`,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                fontFamily: T.fontBody,
+              }}
+              onClick={() => setShowAdvanced(true)}
+            >
+              ⚙ מתקדם
+            </button>
           </div>
-          <button
-            style={s.btnSearch}
-            onClick={() => doSearch(query)}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = T.accentDark)
-            }
-            onMouseLeave={(e) => (e.currentTarget.style.background = T.accent)}
-            disabled={loading}
+        )}
+
+        {showAdvanced && (
+          <div
+            style={{
+              marginTop: 14,
+              paddingTop: 14,
+              borderTop: `1px solid ${T.borderSoft}`,
+            }}
           >
-            {loading ? "מחפש..." : "חיפוש"}
-          </button>
-        </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {advInput("bookName", "שם ספר")}
+              {advInput("authorName", "מחבר")}
+              {advInput("copyCode", "קוד ספר")}
+              {advInput("category", "קטגוריה")}
+
+              {/* חדר */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={s.fieldLabel}>חדר</label>
+                <select
+                  style={s.fieldSelect}
+                  value={advFields.room}
+                  onChange={(e) =>
+                    setAdvFields((p) => ({
+                      ...p,
+                      room: e.target.value,
+                      area: "all",
+                    }))
+                  }
+                >
+                  <option value="all">כל החדרים</option>
+                  <option value="ספרייה">ספרייה</option>
+                  <option value="בית מדרש">בית מדרש</option>
+                </select>
+              </div>
+
+              {/* אזור */}
+              {advFields.room !== "all" && (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                >
+                  <label style={s.fieldLabel}>אזור</label>
+                  <select
+                    style={s.fieldSelect}
+                    value={advFields.area}
+                    onChange={(e) =>
+                      setAdvFields((p) => ({ ...p, area: e.target.value }))
+                    }
+                  >
+                    <option value="all">כל האזורים</option>
+                    {(advFields.room === "ספרייה"
+                      ? AREAS_LIBRARY
+                      : AREAS_BM
+                    ).map((a) => (
+                      <option key={a} value={a}>
+                        {a}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* מדיניות */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={s.fieldLabel}>מדיניות</label>
+                <select
+                  style={s.fieldSelect}
+                  value={advFields.policy}
+                  onChange={(e) =>
+                    setAdvFields((p) => ({ ...p, policy: e.target.value }))
+                  }
+                >
+                  <option value="all">כל המדיניות</option>
+                  <option value="regular">רגיל</option>
+                  <option value="short">טווח קצר</option>
+                  <option value="inplace">לעיון במקום</option>
+                </select>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <button
+                style={{
+                  padding: "7px 18px",
+                  borderRadius: T.radiusSm,
+                  background: T.accent,
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: T.fontBody,
+                }}
+                onClick={() => doSearch(query)}
+              >
+                חפש
+              </button>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text3,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  fontFamily: T.fontBody,
+                }}
+                onClick={() => {
+                  setAdvFields({
+                    bookName: "",
+                    authorName: "",
+                    copyCode: "",
+                    category: "",
+                    room: "all",
+                    area: "all",
+                    policy: "all",
+                  });
+                  setResults([]);
+                  setSearched(false);
+                }}
+              >
+                נקה
+              </button>
+              {hasAdvancedFilters && (
+                <span style={{ fontSize: 12, color: T.accent }}>
+                  • פילטרים פעילים
+                </span>
+              )}
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text3,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: T.fontBody,
+                  marginRight: "auto",
+                }}
+                onClick={() => {
+                  setShowAdvanced(false);
+                  setAdvFields({
+                    bookName: "",
+                    authorName: "",
+                    copyCode: "",
+                    category: "",
+                    room: "all",
+                    area: "all",
+                    policy: "all",
+                  });
+                  setResults([]);
+                  setSearched(false);
+                }}
+              >
+                ▲ חזור לחיפוש פשוט
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && <div style={s.alert}>{error}</div>}
@@ -640,8 +942,8 @@ export default function SearchPage() {
         <div style={s.meta}>
           <span>
             {results.length > 0
-              ? `${results.length} תוצאות עבור "${query}"`
-              : `לא נמצאו תוצאות עבור "${query}"`}
+              ? `${results.length} תוצאות`
+              : "לא נמצאו תוצאות"}
           </span>
           {results.length > 0 && (
             <span style={s.badge}>
