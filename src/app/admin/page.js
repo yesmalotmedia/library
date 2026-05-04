@@ -59,6 +59,66 @@ function CopyButton({ text }) {
   );
 }
 
+// ── Copy Button ─────────────────────────────────────────
+function CP({ text, children }) {
+  const [ok, setOk] = React.useState(false);
+  const [show, setShow] = React.useState(false);
+  const [btnHover, setBtnHover] = React.useState(false);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        cursor: "default",
+      }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => {
+        setShow(false);
+        setBtnHover(false);
+      }}
+    >
+      {children}
+      <button
+        type="button"
+        onMouseEnter={() => setBtnHover(true)}
+        onMouseLeave={() => setBtnHover(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          navigator.clipboard
+            .writeText(text || "")
+            .then(() => {
+              setOk(true);
+              setTimeout(() => setOk(false), 1200);
+            })
+            .catch(() => {});
+        }}
+        style={{
+          visibility: show || ok ? "visible" : "hidden",
+          width: 46,
+          height: 18,
+          borderRadius: 3,
+          fontSize: 10,
+          fontWeight: 600,
+          cursor: "pointer",
+          background: ok ? T.green : btnHover ? T.green : T.surface2,
+          color: ok || btnHover ? "#fff" : T.text3,
+          border: `1px solid ${ok || btnHover ? T.green : T.border}`,
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 1,
+        }}
+      >
+        {ok ? "✓" : "העתק"}
+      </button>
+    </span>
+  );
+}
+
 // ── Book Modal ─────────────────────────────────────────────
 function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
   const isEdit = !!book && !book._isDuplicate;
@@ -116,17 +176,21 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
         (c) =>
           c.code.toLowerCase().startsWith(normalizedQuery.toLowerCase()) ||
           c.desc.toLowerCase().includes(normalizedQuery.toLowerCase()),
-      ).slice(0, 30)
+      ).slice(0, 100)
     : [];
   const displayCats =
     normalizedQuery.trim().length === 1
       ? CATEGORIES.filter((c) =>
           c.code.toLowerCase().startsWith(normalizedQuery.toLowerCase()),
-        ).slice(0, 30)
+        ).slice(0, 100)
       : filteredCats;
 
   function handleRoomChange(room) {
-    setForm((f) => ({ ...f, room, area: "" }));
+    setForm((f) => ({
+      ...f,
+      room,
+      area: room === "ספרייה" && f.category ? f.category : "",
+    }));
   }
   function handleCategorySelect(cat) {
     setForm((f) => ({
@@ -791,6 +855,7 @@ function BorrowerModal({ borrower, onClose, onSave }) {
               <option value="תלמיד">תלמיד</option>
               <option value="מבקשי פניך">מבקשי פניך</option>
               <option value="בני מנשה">בני מנשה</option>
+              <option value="כולל">כולל</option>
               <option value="צוות">צוות</option>
               <option value="אורח">אורח</option>
             </select>
@@ -1002,28 +1067,15 @@ function BookRow({
             {open ? "⌃" : "⌄"}
           </td>
         )}
-        {!selectionMode && (
-          <td
-            style={td({
-              fontFamily: "monospace",
-              fontSize: 11,
-              color: T.text3,
-              borderTop: open ? `2px solid ${T.border}` : "none",
-              whiteSpace: "nowrap",
-            })}
-          >
-            {r.serialNum || "—"}
-          </td>
-        )}
+
         <td
           style={td({
-            fontFamily: "monospace",
             fontSize: 12,
             color: T.text3,
             borderTop: open ? `2px solid ${T.border}` : "none",
           })}
         >
-          {r.tempCopyCode}
+          <CP text={r.tempCopyCode}>{r.tempCopyCode}</CP>
         </td>
         <td
           style={td({
@@ -1039,7 +1091,19 @@ function BookRow({
               whiteSpace: "nowrap",
             }}
           >
-            {r.bookName || "—"}
+            <CP text={r.bookName}>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  display: "block",
+                  maxWidth: 180,
+                }}
+              >
+                {r.bookName || "—"}
+              </span>
+            </CP>
           </div>
         </td>
         <td
@@ -1048,7 +1112,11 @@ function BookRow({
             borderTop: open ? `2px solid ${T.border}` : "none",
           })}
         >
-          {r.authorName || "—"}
+          <CP text={r.authorName}>
+            {r.authorName
+              ? `${r.authorName}${r.authorRole ? ` (${r.authorRole})` : ""}`
+              : "—"}
+          </CP>
         </td>
         <td
           style={td({
@@ -1330,16 +1398,15 @@ function BorrowerRow({ r, s, td, onEdit, onDelete }) {
         </td>
         <td
           style={td({
-            fontFamily: "monospace",
             fontSize: 12,
             color: T.text3,
             borderTop: open ? `2px solid ${T.border}` : "none",
           })}
         >
-          {r.borrowerID}
+          <CP text={r.borrowerID}>{r.borrowerID}</CP>
         </td>
         <td style={td({ borderTop: open ? `2px solid ${T.border}` : "none" })}>
-          {r.firstName || "—"}
+          <CP text={r.firstName}>{r.firstName || "—"}</CP>
         </td>
         <td
           style={td({
@@ -1347,7 +1414,7 @@ function BorrowerRow({ r, s, td, onEdit, onDelete }) {
             borderTop: open ? `2px solid ${T.border}` : "none",
           })}
         >
-          {r.lastName || "—"}
+          <CP text={r.lastName}>{r.lastName || "—"}</CP>
         </td>
         <td
           style={td({
@@ -1561,6 +1628,59 @@ function BorrowerRow({ r, s, td, onEdit, onDelete }) {
         </tr>
       )}
     </>
+  );
+}
+
+// ── Loan Row ──────────────────────────────────────────────
+function LoanRow({ r, td, s }) {
+  const isOverdue =
+    r.dueDate &&
+    (() => {
+      try {
+        const [d, m, y] = r.dueDate.split("/");
+        return new Date(`${y}-${m}-${d}`) < new Date();
+      } catch {
+        return false;
+      }
+    })();
+  const name = r.borrower
+    ? `${r.borrower.firstName || ""} ${r.borrower.lastName || ""}`.trim()
+    : "—";
+
+  return (
+    <tr
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#fafbff")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+    >
+      <td style={td({ fontSize: 12, color: T.text3 })}>{r.loanID}</td>
+      <td style={td({ fontSize: 12 })}>
+        <CP text={r.bookID}>{r.bookID}</CP>
+      </td>
+      <td style={td({ fontWeight: 500 })}>
+        <CP text={r.bookName}>{r.bookName || "—"}</CP>
+      </td>
+      <td style={td({ color: T.text3 })}>
+        <CP text={r.borrowerID}>{r.borrowerID}</CP>
+      </td>
+      <td style={td({ fontWeight: 500 })}>{name}</td>
+      <td style={td()}>{r.loanDate}</td>
+      <td style={td()}>
+        <span
+          style={{
+            color: isOverdue ? T.red : "inherit",
+            fontWeight: isOverdue ? 600 : 400,
+          }}
+        >
+          {r.dueDate || "—"}
+          {isOverdue && " ⚠️"}
+        </span>
+      </td>
+      <td style={td()}>
+        <a href={`/returns?copyCode=${r.bookID}`} style={s.btnSmall(T.red)}>
+          החזר
+        </a>
+      </td>
+    </tr>
   );
 }
 
@@ -2115,7 +2235,6 @@ export default function AdminPage() {
     ],
     books: [
       ["", "", false],
-      ["serialNum", "מס'", true],
       ["tempCopyCode", "קוד ספר"],
       ["bookName", "שם הספר"],
       ["authorName", "מחבר"],
@@ -2129,7 +2248,7 @@ export default function AdminPage() {
       ["borrowerID", "ת״ז"],
       ["firstName", "שם פרטי"],
       ["lastName", "שם משפחה"],
-      ["shiur", "שיעור"],
+      ["shiur", "שיעור", false],
       ["phone", "טלפון"],
       ["isBlocked", "חסום"],
       ["activeLoansCount", "מושאלים"],
@@ -2384,12 +2503,30 @@ export default function AdminPage() {
           </>
         )}
         {tab === "borrowers" && (
-          <button
-            style={s.btn(T.accent)}
-            onClick={() => setBorrowerModal("add")}
-          >
-            + הוסף שואל
-          </button>
+          <>
+            <button
+              style={s.btn(T.accent)}
+              onClick={() => setBorrowerModal("add")}
+            >
+              + הוסף שואל
+            </button>
+            <select
+              style={s.select}
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="all">כל הסוגים</option>
+              <option value="תלמיד">תלמיד</option>
+              <option value="מבקשי פניך">מבקשי פניך</option>
+              <option value="בני מנשה">בני מנשה</option>
+              <option value="כולל">כולל</option>
+              <option value="צוות">צוות</option>
+              <option value="אורח">אורח</option>
+            </select>
+          </>
         )}
         {!loading && !selectionMode && (
           <span style={s.meta}>
@@ -2448,72 +2585,9 @@ export default function AdminPage() {
                 )}
 
                 {tab === "loans" &&
-                  rows.map((r) => {
-                    const isOverdue =
-                      r.dueDate &&
-                      (() => {
-                        try {
-                          const [d, m, y] = r.dueDate.split("/");
-                          return new Date(`${y}-${m}-${d}`) < new Date();
-                        } catch {
-                          return false;
-                        }
-                      })();
-                    const name = r.borrower
-                      ? `${r.borrower.firstName || ""} ${r.borrower.lastName || ""}`.trim()
-                      : "—";
-                    return (
-                      <tr
-                        key={r.loanID}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = "#fafbff")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "")
-                        }
-                      >
-                        <td
-                          style={td({
-                            fontFamily: "monospace",
-                            fontSize: 12,
-                            color: T.text3,
-                          })}
-                        >
-                          {r.loanID}
-                        </td>
-                        <td
-                          style={td({ fontFamily: "monospace", fontSize: 12 })}
-                        >
-                          {r.bookID}
-                        </td>
-                        <td style={td({ fontWeight: 500 })}>
-                          {r.bookName || "—"}
-                        </td>
-                        <td style={td({ color: T.text3 })}>{r.borrowerID}</td>
-                        <td style={td({ fontWeight: 500 })}>{name}</td>
-                        <td style={td()}>{r.loanDate}</td>
-                        <td style={td()}>
-                          <span
-                            style={{
-                              color: isOverdue ? T.red : "inherit",
-                              fontWeight: isOverdue ? 600 : 400,
-                            }}
-                          >
-                            {r.dueDate || "—"}
-                            {isOverdue && " ⚠️"}
-                          </span>
-                        </td>
-                        <td style={td()}>
-                          <a
-                            href={`/returns?copyCode=${r.bookID}`}
-                            style={s.btnSmall(T.red)}
-                          >
-                            החזר
-                          </a>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  rows.map((r) => (
+                    <LoanRow key={r.loanID} r={r} td={td} s={s} />
+                  ))}
 
                 {tab === "books" &&
                   rows.map((r) => (
@@ -2569,7 +2643,7 @@ export default function AdminPage() {
                 disabled={page === 1}
                 onClick={() => setPage(1)}
               >
-                ⏮
+                ⏭
               </button>
               <button
                 style={s.btnGhost}
@@ -2593,7 +2667,7 @@ export default function AdminPage() {
                 disabled={page === totalPages}
                 onClick={() => setPage(totalPages)}
               >
-                ⏭
+                ⏮
               </button>
             </div>
           )}

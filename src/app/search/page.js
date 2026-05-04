@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
 
@@ -428,7 +428,11 @@ function BookRow({ book, expandedId, onToggle, onNotify }) {
             {book.bookName || "—"}
           </div>
         </td>
-        <td style={tdBase({ color: T.text2 })}>{book.authorName || "—"}</td>
+        <td style={tdBase({ color: T.text2 })}>
+          {book.authorName
+            ? `${book.authorName}${book.authorRole ? ` (${book.authorRole})` : ""}`
+            : "—"}
+        </td>
         <td style={tdBase({ color: T.text2, fontSize: 13 })}>
           {location || "—"}
         </td>
@@ -493,6 +497,9 @@ export default function SearchPage() {
   const { responsive, isMobile } = useResponsive();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
@@ -652,7 +659,7 @@ export default function SearchPage() {
   );
 
   const doSearch = useCallback(
-    async (q) => {
+    async (q, p = 1) => {
       const isAdv = hasAdvancedFilters || showAdvanced;
       if (!q.trim() && !isAdv) return;
       setLoading(true);
@@ -663,7 +670,8 @@ export default function SearchPage() {
         if (isAdv) {
           const params = new URLSearchParams({
             advanced: "true",
-            limit: "2000",
+            limit: "100",
+            page: String(p),
           });
           if (q.trim()) params.set("q", q.trim());
           Object.entries(advFields).forEach(([k, v]) => {
@@ -671,12 +679,15 @@ export default function SearchPage() {
           });
           url = `/api/books?${params}`;
         } else {
-          url = `/api/books?q=${encodeURIComponent(q)}&limit=2000`;
+          url = `/api/books?q=${encodeURIComponent(q)}&limit=100&page=${p}`;
         }
         const res = await fetch(url);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "שגיאה");
         setResults(data.results || []);
+        setTotal(data.total || 0);
+        setPage(data.page || 1);
+        setTotalPages(data.totalPages || 0);
         setSearched(true);
       } catch (e) {
         setError(e.message);
@@ -938,22 +949,45 @@ export default function SearchPage() {
 
       {error && <div style={s.alert}>{error}</div>}
 
+      {loading && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "60px 0",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: `3px solid ${T.border}`,
+              borderTopColor: T.accent,
+              animation: "spin 0.8s linear infinite",
+            }}
+          />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
       {searched && !loading && (
         <div style={s.meta}>
           <span>
-            {results.length > 0
-              ? `${results.length} תוצאות`
+            {total > 0
+              ? `${total} תוצאות${totalPages > 1 ? ` · עמוד ${page}/${totalPages}` : ""}`
               : "לא נמצאו תוצאות"}
           </span>
-          {results.length > 0 && (
+          {total > 0 && (
             <span style={s.badge}>
-              {results.filter((b) => !b.isBorrowed).length} פנויים
+              {results.filter((b) => !b.isBorrowed).length} פנויים בעמוד זה
             </span>
           )}
         </div>
       )}
 
-      {results.length > 0 && (
+      {results.length > 0 && !loading && (
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
@@ -982,6 +1016,106 @@ export default function SearchPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && searched && !loading && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === 1 ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === 1 ? 0.4 : 1,
+                }}
+                disabled={page === 1}
+                onClick={() => {
+                  setPage(1);
+                  doSearch(query, 1);
+                }}
+              >
+                ⏭
+              </button>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === 1 ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === 1 ? 0.4 : 1,
+                }}
+                disabled={page === 1}
+                onClick={() => {
+                  const p = page - 1;
+                  setPage(p);
+                  doSearch(query, p);
+                }}
+              >
+                → הקודם
+              </button>
+              <span style={{ fontSize: 13, color: T.text3 }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === totalPages ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === totalPages ? 0.4 : 1,
+                }}
+                disabled={page === totalPages}
+                onClick={() => {
+                  const p = page + 1;
+                  setPage(p);
+                  doSearch(query, p);
+                }}
+              >
+                הבא ←
+              </button>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === totalPages ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === totalPages ? 0.4 : 1,
+                }}
+                disabled={page === totalPages}
+                onClick={() => {
+                  setPage(totalPages);
+                  doSearch(query, totalPages);
+                }}
+              >
+                ⏮
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

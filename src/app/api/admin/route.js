@@ -117,14 +117,22 @@ export async function GET(request) {
         activeLoansCount: activeLoanMap[b.borrowerID] || 0,
         shiur: calcShiur(b.type, b.year),
       }));
-      if (q)
+      if (q) {
+        const ql = q.toLowerCase();
         borrowers = borrowers.filter(
           (b) =>
             (b.borrowerID || "").includes(q) ||
-            (b.firstName || "").toLowerCase().includes(q.toLowerCase()) ||
-            (b.lastName || "").toLowerCase().includes(q.toLowerCase()) ||
-            (b.shiur || "").toLowerCase().includes(q.toLowerCase()),
+            (b.firstName || "").toLowerCase().includes(ql) ||
+            (b.lastName || "").toLowerCase().includes(ql) ||
+            ((b.firstName || "") + " " + (b.lastName || ""))
+              .toLowerCase()
+              .includes(ql) ||
+            ((b.lastName || "") + " " + (b.firstName || ""))
+              .toLowerCase()
+              .includes(ql) ||
+            (b.shiur || "").toLowerCase().includes(ql),
         );
+      }
       const type = searchParams.get("type");
       if (type && type !== "all")
         borrowers = borrowers.filter((b) => b.type === type);
