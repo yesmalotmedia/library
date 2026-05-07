@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { T } from "@/lib/theme";
 
@@ -11,6 +11,77 @@ const BUG_TYPES = [
   "בקשת שיפור",
   "אחר",
 ];
+
+// ── Progress Circle ──────────────────────────────────────
+function ProgressCircle({ done }) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (done) {
+      setProgress(100);
+      return;
+    }
+    const interval = 50;
+    const timer = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 80) {
+          clearInterval(timer);
+          return 80;
+        }
+        const speed = p < 50 ? 1.2 : 0.4;
+        return Math.min(p + speed, 80);
+      });
+    }, interval);
+    return () => clearInterval(timer);
+  }, [done]);
+
+  const r = 18;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (progress / 100) * circ;
+  const color = done ? "#22c55e" : "#6366f1";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+        padding: "16px 0",
+      }}
+    >
+      <svg width={48} height={48} style={{ transform: "rotate(-90deg)" }}>
+        <circle
+          cx={24}
+          cy={24}
+          r={r}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth={3}
+        />
+        <circle
+          cx={24}
+          cy={24}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{
+            transition: done
+              ? "stroke-dashoffset 0.3s ease"
+              : "stroke-dashoffset 0.05s linear",
+          }}
+        />
+      </svg>
+      <span style={{ fontSize: 12, color: done ? "#22c55e" : "#6b7280" }}>
+        {done ? "✓ נשלח!" : `שולח... ${Math.round(progress)}%`}
+      </span>
+    </div>
+  );
+}
 
 export default function BugReport() {
   const pathname = usePathname();
@@ -259,18 +330,20 @@ export default function BugReport() {
                   onBlur={(e) => (e.target.style.borderColor = T.border)}
                 />
 
-                <div style={s.actions}>
-                  <button style={s.btnGhost} onClick={() => setOpen(false)}>
-                    ביטול
-                  </button>
-                  <button
-                    style={s.btn(T.accent, sending)}
-                    disabled={sending}
-                    onClick={handleSubmit}
-                  >
-                    {sending ? "שולח..." : "שלח"}
-                  </button>
-                </div>
+                {sending && <ProgressCircle done={sent} />}
+                {!sending && (
+                  <div style={s.actions}>
+                    <button style={s.btnGhost} onClick={() => setOpen(false)}>
+                      ביטול
+                    </button>
+                    <button
+                      style={s.btn(T.accent, false)}
+                      onClick={handleSubmit}
+                    >
+                      שלח
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>

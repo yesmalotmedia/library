@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
 
-const TIMEOUT_MS = 60 * 1000; // דקה
+const TIMEOUT_MS = 60 * 1000;
 
 function StatusBadge({ isOverdue, daysLeft }) {
   if (isOverdue)
@@ -52,17 +53,63 @@ function StatusBadge({ isOverdue, daysLeft }) {
   );
 }
 
-export default function MyPage() {
+function MyContent() {
+  const searchParams = useSearchParams();
   const { responsive } = useResponsive();
   const [tzInput, setTzInput] = useState("");
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("active");
-  const [waitlistBook, setWaitlistBook] = useState(null); // ספר להוסיף להמתנה
   const [waitlistCode, setWaitlistCode] = useState("");
   const [waitlistMsg, setWaitlistMsg] = useState("");
   const timerRef = useRef(null);
+
+  // Auto-login from URL borrowerID param
+  useEffect(() => {
+    // שחזר סשן מעמוד ההשאלה
+    try {
+      const saved = sessionStorage.getItem("checkout_borrower");
+      if (saved) {
+        const { data: b, exp } = JSON.parse(saved);
+        if (exp > Date.now() && !data) {
+          setTzInput(b.borrowerID);
+          fetch(`/api/borrower?borrowerID=${encodeURIComponent(b.borrowerID)}`)
+            .then((r) => r.json())
+            .then((json) => {
+              if (json.borrower) setData(json);
+            })
+            .catch(() => {});
+          return;
+        } else if (exp <= Date.now()) {
+          sessionStorage.removeItem("checkout_borrower");
+        }
+      }
+    } catch {}
+
+    const id = searchParams.get("borrowerID");
+    if (id) {
+      setTzInput(id);
+      fetch(`/api/borrower?borrowerID=${encodeURIComponent(id)}`)
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.borrower) {
+            setData(json);
+            try {
+              const b = {
+                ...json.borrower,
+                activeLoans: json.activeLoans || [],
+              };
+              sessionStorage.setItem(
+                "checkout_borrower",
+                JSON.stringify({ data: b, exp: Date.now() + 60000 }),
+              );
+            } catch {}
+          } else setError(json.error || "שואל לא נמצא");
+        })
+        .catch(() => setError("שגיאת שרת"));
+    }
+  }, []);
 
   // Auto-logout after 1 minute
   useEffect(() => {
@@ -98,6 +145,13 @@ export default function MyPage() {
         return;
       }
       setData(json);
+      try {
+        const b = { ...json.borrower, activeLoans: json.activeLoans || [] };
+        sessionStorage.setItem(
+          "checkout_borrower",
+          JSON.stringify({ data: b, exp: Date.now() + 60000 }),
+        );
+      } catch {}
     } catch {
       setError("שגיאת שרת");
     } finally {
@@ -271,7 +325,6 @@ export default function MyPage() {
     [responsive],
   );
 
-  // ── Login screen ────────────────────────────────────────
   if (!data) {
     return (
       <div style={s.page}>
@@ -283,7 +336,7 @@ export default function MyPage() {
           <label style={s.label}>מספר ת"ז</label>
           <input
             style={{ ...s.input, marginBottom: 16 }}
-            placeholder={'הכנס מספר ת"ז...'}
+            placeholder='הכנס מספר ת"ז...'
             value={tzInput}
             onChange={(e) => {
               setTzInput(e.target.value);
@@ -315,10 +368,8 @@ export default function MyPage() {
 
   const { borrower, activeLoans, history, waitlist } = data;
 
-  // ── Personal area ────────────────────────────────────────
   return (
     <div style={s.page}>
-      {/* Profile header */}
       <div style={s.profileCard}>
         <div>
           <div
@@ -356,7 +407,6 @@ export default function MyPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={s.tabs}>
         <button
           style={s.tab(tab === "active")}
@@ -384,7 +434,6 @@ export default function MyPage() {
         </button>
       </div>
 
-      {/* Active loans */}
       {tab === "active" && (
         <div>
           {activeLoans.length === 0 && (
@@ -427,12 +476,13 @@ export default function MyPage() {
               </div>
               <div style={{ marginTop: 10 }}>
                 <a
-                  href={`/returns?serialNum=${loan.bookID}`}
+                  href={`/returns?copyCode=${loan.bookID}`}
                   style={{
                     ...s.btn(T.green),
                     padding: "6px 14px",
                     fontSize: 12,
                     display: "inline-block",
+                    textDecoration: "none",
                   }}
                 >
                   ↩️ החזר
@@ -443,7 +493,6 @@ export default function MyPage() {
         </div>
       )}
 
-      {/* History */}
       {tab === "history" && (
         <div>
           {history.length === 0 && (
@@ -462,7 +511,6 @@ export default function MyPage() {
         </div>
       )}
 
-      {/* Waitlist */}
       {tab === "waitlist" && (
         <div>
           {waitlist.length === 0 && (
@@ -481,7 +529,6 @@ export default function MyPage() {
         </div>
       )}
 
-      {/* Notify me */}
       {tab === "notify" && (
         <div style={s.waitCard}>
           <div
@@ -526,5 +573,13 @@ export default function MyPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MyPage() {
+  return (
+    <Suspense>
+      <MyContent />
+    </Suspense>
   );
 }

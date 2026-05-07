@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
@@ -489,6 +489,96 @@ function BookRow({ book, expandedId, onToggle, onNotify }) {
         </tr>
       )}
     </>
+  );
+}
+
+// ── Category Input ────────────────────────────────────────
+function CategoryInput({ value, onChange, fieldLabel, fieldInput }) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = React.useRef(null);
+
+  const filtered =
+    value.trim().length >= 1
+      ? CATEGORIES.filter(
+          (c) =>
+            c.code.toLowerCase().startsWith(value.toLowerCase()) ||
+            c.desc.toLowerCase().includes(value.toLowerCase()),
+        ).slice(0, 50)
+      : [];
+  console.log("cat:", value, filtered.length, open);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        position: "relative",
+      }}
+    >
+      <label style={fieldLabel}>קטגוריה</label>
+      <input
+        style={fieldInput}
+        placeholder="קטגוריה..."
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          if (closeTimer.current) clearTimeout(closeTimer.current);
+        }}
+        onFocus={(e) => {
+          e.target.style.borderColor = T.accent;
+          setOpen(true);
+          if (closeTimer.current) clearTimeout(closeTimer.current);
+        }}
+        onBlur={(e) => {
+          e.target.style.borderColor = T.border;
+          closeTimer.current = setTimeout(() => setOpen(false), 200);
+        }}
+      />
+      {open && filtered.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            left: 0,
+            background: T.surface,
+            border: `1px solid ${T.border}`,
+            borderRadius: T.radiusSm,
+            boxShadow: T.shadowMd,
+            zIndex: 100,
+            maxHeight: 200,
+            overflowY: "auto",
+          }}
+        >
+          {filtered.map((c) => (
+            <div
+              key={c.code}
+              onMouseDown={() => {
+                onChange(c.desc || c.code);
+                setOpen(false);
+              }}
+              style={{
+                padding: "7px 12px",
+                fontSize: 13,
+                cursor: "pointer",
+                borderBottom: `1px solid ${T.borderSoft}`,
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = T.surface2)
+              }
+              onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+            >
+              <span style={{ color: T.text3, fontSize: 11, marginLeft: 6 }}>
+                {c.code}
+              </span>
+              <span>{c.desc || c.code}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -987,7 +1077,108 @@ export default function SearchPage() {
         </div>
       )}
 
-      {results.length > 0 && !loading && (
+      {totalPages > 1 && searched && !loading && (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <button
+            style={{
+              padding: "7px 14px",
+              borderRadius: T.radiusSm,
+              background: "transparent",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: page === 1 ? "not-allowed" : "pointer",
+              fontFamily: T.fontBody,
+              opacity: page === 1 ? 0.4 : 1,
+            }}
+            disabled={page === 1}
+            onClick={() => {
+              setPage(1);
+              doSearch(query, 1);
+            }}
+          >
+            ⏮
+          </button>
+          <button
+            style={{
+              padding: "7px 14px",
+              borderRadius: T.radiusSm,
+              background: "transparent",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: page === 1 ? "not-allowed" : "pointer",
+              fontFamily: T.fontBody,
+              opacity: page === 1 ? 0.4 : 1,
+            }}
+            disabled={page === 1}
+            onClick={() => {
+              const p = page - 1;
+              setPage(p);
+              doSearch(query, p);
+            }}
+          >
+            → הקודם
+          </button>
+          <span style={{ fontSize: 13, color: T.text3 }}>
+            {page} / {totalPages}
+          </span>
+          <button
+            style={{
+              padding: "7px 14px",
+              borderRadius: T.radiusSm,
+              background: "transparent",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: page === totalPages ? "not-allowed" : "pointer",
+              fontFamily: T.fontBody,
+              opacity: page === totalPages ? 0.4 : 1,
+            }}
+            disabled={page === totalPages}
+            onClick={() => {
+              const p = page + 1;
+              setPage(p);
+              doSearch(query, p);
+            }}
+          >
+            הבא ←
+          </button>
+          <button
+            style={{
+              padding: "7px 14px",
+              borderRadius: T.radiusSm,
+              background: "transparent",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: page === totalPages ? "not-allowed" : "pointer",
+              fontFamily: T.fontBody,
+              opacity: page === totalPages ? 0.4 : 1,
+            }}
+            disabled={page === totalPages}
+            onClick={() => {
+              setPage(totalPages);
+              doSearch(query, totalPages);
+            }}
+          >
+            ⏭
+          </button>
+        </div>
+      )}
+
+      {results.length > 0 && (
         <div style={s.tableWrap}>
           <table style={s.table}>
             <thead>
@@ -1016,106 +1207,6 @@ export default function SearchPage() {
               ))}
             </tbody>
           </table>
-          {totalPages > 1 && searched && !loading && (
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <button
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: T.radiusSm,
-                  background: "transparent",
-                  color: T.text2,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: page === 1 ? "not-allowed" : "pointer",
-                  fontFamily: T.fontBody,
-                  opacity: page === 1 ? 0.4 : 1,
-                }}
-                disabled={page === 1}
-                onClick={() => {
-                  setPage(1);
-                  doSearch(query, 1);
-                }}
-              >
-                ⏭
-              </button>
-              <button
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: T.radiusSm,
-                  background: "transparent",
-                  color: T.text2,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: page === 1 ? "not-allowed" : "pointer",
-                  fontFamily: T.fontBody,
-                  opacity: page === 1 ? 0.4 : 1,
-                }}
-                disabled={page === 1}
-                onClick={() => {
-                  const p = page - 1;
-                  setPage(p);
-                  doSearch(query, p);
-                }}
-              >
-                → הקודם
-              </button>
-              <span style={{ fontSize: 13, color: T.text3 }}>
-                {page} / {totalPages}
-              </span>
-              <button
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: T.radiusSm,
-                  background: "transparent",
-                  color: T.text2,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: page === totalPages ? "not-allowed" : "pointer",
-                  fontFamily: T.fontBody,
-                  opacity: page === totalPages ? 0.4 : 1,
-                }}
-                disabled={page === totalPages}
-                onClick={() => {
-                  const p = page + 1;
-                  setPage(p);
-                  doSearch(query, p);
-                }}
-              >
-                הבא ←
-              </button>
-              <button
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: T.radiusSm,
-                  background: "transparent",
-                  color: T.text2,
-                  border: `1px solid ${T.border}`,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: page === totalPages ? "not-allowed" : "pointer",
-                  fontFamily: T.fontBody,
-                  opacity: page === totalPages ? 0.4 : 1,
-                }}
-                disabled={page === totalPages}
-                onClick={() => {
-                  setPage(totalPages);
-                  doSearch(query, totalPages);
-                }}
-              >
-                ⏮
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

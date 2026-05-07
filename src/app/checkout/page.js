@@ -1,8 +1,256 @@
 "use client";
-import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
+
+// ── Active Loans Accordion ───────────────────────────────
+function ActiveLoansAccordion({ loans }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div
+      style={{ marginTop: 8, borderTop: "1px solid #bfdbfe", paddingTop: 6 }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontSize: 12,
+          color: T.text2,
+          fontFamily: T.fontBody,
+          fontWeight: 600,
+          padding: "2px 0",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {open ? "▲" : "▼"} הצג ספרים מושאלים ({loans.length})
+      </button>
+      {open && (
+        <div style={{ marginTop: 6 }}>
+          {loans.map((loan, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "5px 0",
+                borderBottom:
+                  i < loans.length - 1 ? "1px solid #dbeafe" : "none",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 12 }}>
+                  {loan.book?.bookName || loan.bookID}
+                </div>
+                <div style={{ fontSize: 11, color: T.text3 }}>
+                  קוד: {loan.bookID}
+                  {loan.dueDate ? ` · עד: ${loan.dueDate}` : ""}
+                </div>
+              </div>
+              {loan.isOverdue && (
+                <span style={{ fontSize: 11, color: T.red, fontWeight: 600 }}>
+                  ⚠️ באיחור
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Step Bar ────────────────────────────────────────────
+function StepBar({ borrower, hasBooks }) {
+  const step = !borrower ? 1 : !hasBooks ? 2 : 3;
+  const steps = [
+    { n: 1, label: 'הזן ת"ז' },
+    { n: 2, label: "הזן קוד ספר" },
+    { n: 3, label: "אשר השאלה" },
+  ];
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 0,
+        marginBottom: 4,
+      }}
+    >
+      {steps.map((s, i) => (
+        <React.Fragment key={s.n}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background:
+                  step > s.n ? T.green : step === s.n ? T.accent : T.border,
+                color: step >= s.n ? "#fff" : T.text3,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 700,
+                transition: "all 0.3s",
+                boxShadow: step === s.n ? `0 0 0 4px ${T.accentLt}` : "none",
+              }}
+            >
+              {step > s.n ? "✓" : s.n}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: step === s.n ? 700 : 400,
+                color: step === s.n ? T.accent : step > s.n ? T.green : T.text3,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {s.label}
+            </div>
+          </div>
+          {i < steps.length - 1 && (
+            <div
+              style={{
+                height: 2,
+                width: 60,
+                background: step > i + 1 ? T.green : T.border,
+                margin: "0 4px",
+                marginBottom: 18,
+                transition: "all 0.3s",
+              }}
+            />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+// ── Confirm Modal ────────────────────────────────────────
+function ConfirmModal({ bookItems, borrower, confirming, onConfirm, onClose }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          background: T.surface,
+          borderRadius: T.radius,
+          padding: 28,
+          maxWidth: 440,
+          width: "90%",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: T.fontDisplay,
+            fontWeight: 700,
+            fontSize: 18,
+            marginBottom: 6,
+            color: T.text,
+          }}
+        >
+          אישור השאלה
+        </div>
+        <div style={{ fontSize: 13, color: T.text3, marginBottom: 16 }}>
+          {borrower?.firstName} {borrower?.lastName} · ת"ז:{" "}
+          {borrower?.borrowerID}
+        </div>
+        <div
+          style={{
+            background: T.surface2,
+            borderRadius: T.radiusSm,
+            border: `1px solid ${T.border}`,
+            marginBottom: 20,
+            overflow: "hidden",
+          }}
+        >
+          {bookItems.map((item, i) => (
+            <div
+              key={item.id}
+              style={{
+                padding: "10px 14px",
+                borderBottom:
+                  i < bookItems.length - 1
+                    ? `1px solid ${T.borderSoft}`
+                    : "none",
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                {item.bookName}
+              </div>
+              <div style={{ fontSize: 11, color: T.text3 }}>
+                {item.authorName} · קוד: {item.id}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              borderRadius: T.radiusSm,
+              background: "transparent",
+              color: T.text2,
+              border: `1px solid ${T.border}`,
+              fontSize: 13.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: T.fontBody,
+            }}
+          >
+            ביטול
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={confirming}
+            style={{
+              padding: "10px 24px",
+              borderRadius: T.radiusSm,
+              background: confirming ? T.text3 : T.accent,
+              color: "#fff",
+              border: "none",
+              fontSize: 13.5,
+              fontWeight: 700,
+              cursor: confirming ? "not-allowed" : "pointer",
+              fontFamily: T.fontBody,
+            }}
+          >
+            {confirming
+              ? "מעבד..."
+              : `✓ אשר השאלת ${bookItems.length} ספר${bookItems.length > 1 ? "ים" : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -21,10 +269,38 @@ function CheckoutContent() {
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState(null);
   const [addingMore, setAddingMore] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     const code = searchParams.get("copyCode") || searchParams.get("serialNum");
     if (code) setCurrentCode(code);
+    // שחזר סשן אם קיים
+    try {
+      const saved = sessionStorage.getItem("checkout_borrower");
+      if (saved) {
+        const { data, exp } = JSON.parse(saved);
+        if (exp > Date.now()) {
+          setBorrower(data);
+          setBorrowerID(data.borrowerID);
+        } else {
+          sessionStorage.removeItem("checkout_borrower");
+        }
+      }
+    } catch {}
+  }, []);
+
+  // auto-login from URL borrowerID param
+  useEffect(() => {
+    const id = searchParams.get("borrowerID");
+    if (id && !borrower) {
+      setBorrowerID(id);
+      fetch(`/api/borrower?borrowerID=${encodeURIComponent(id)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.borrower) setBorrower(data);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -46,18 +322,24 @@ function CheckoutContent() {
     setBorrower(null);
     try {
       const res = await fetch(
-        `/api/borrowers/${encodeURIComponent(borrowerID.trim())}`,
+        `/api/borrower?borrowerID=${encodeURIComponent(borrowerID.trim())}`,
       );
       const data = await res.json();
       if (!res.ok) {
-        setBorrowerError(data.error);
+        setBorrowerError(data.error || "שואל לא נמצא");
         return;
       }
-      if (data.isBlocked === "TRUE") {
+      if (data.borrower?.isBlocked === "TRUE") {
         setBorrowerError("שואל זה חסום במערכת");
         return;
       }
-      setBorrower(data);
+      const b = { ...data.borrower, activeLoans: data.activeLoans || [] };
+      setBorrower(b);
+      // שמור בסשן לדקה
+      sessionStorage.setItem(
+        "checkout_borrower",
+        JSON.stringify({ data: b, exp: Date.now() + 60000 }),
+      );
     } catch {
       setBorrowerError("שגיאה בחיפוש שואל");
     }
@@ -362,29 +644,56 @@ function CheckoutContent() {
         <h1 style={s.title}>השאלת ספר</h1>
         <p style={s.subtitle}>מלא תעודת זהות, הזן קודי ספרים ואשר</p>
       </div>
+      <StepBar borrower={borrower} hasBooks={hasBooks} />
+      {hasBooks && (
+        <button
+          style={{
+            width: "100%",
+            padding: "16px",
+            borderRadius: T.radiusSm,
+            background: T.green,
+            color: "#fff",
+            border: "none",
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: T.fontBody,
+            letterSpacing: "0.01em",
+            boxShadow: `0 4px 14px rgba(34,197,94,0.4)`,
+          }}
+          onClick={handleConfirm}
+        >
+          ✓ בצע השאלה ({bookItems.length} ספר{bookItems.length > 1 ? "ים" : ""})
+          ←
+        </button>
+      )}
 
       <div style={s.card}>
-        <label style={s.label}>מספר ת&quot;ז שואל</label>
-        <div style={s.row}>
-          <input
-            style={s.input(false)}
-            placeholder='הכנס מספר ת"ז...'
-            value={borrowerID}
-            onChange={(e) => {
-              setBorrowerID(e.target.value);
-              setBorrower(null);
-              setBorrowerError("");
-            }}
-            onKeyDown={(e) => e.key === "Enter" && verifyBorrower()}
-            onFocus={(e) => (e.target.style.borderColor = T.accent)}
-            onBlur={(e) => (e.target.style.borderColor = T.border)}
-            autoFocus
-          />
-          <button style={s.btn(T.accent)} onClick={verifyBorrower}>
-            אמת
-          </button>
-        </div>
-        {borrowerError && <div style={s.alertBox}>{borrowerError}</div>}
+        {!borrower && (
+          <>
+            <label style={s.label}>מספר ת&quot;ז שואל</label>
+            <div style={s.row}>
+              <input
+                style={s.input(false)}
+                placeholder='הכנס מספר ת"ז...'
+                value={borrowerID}
+                onChange={(e) => {
+                  setBorrowerID(e.target.value);
+                  setBorrower(null);
+                  setBorrowerError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && verifyBorrower()}
+                onFocus={(e) => (e.target.style.borderColor = T.accent)}
+                onBlur={(e) => (e.target.style.borderColor = T.border)}
+                autoFocus
+              />
+              <button style={s.btn(T.accent)} onClick={verifyBorrower}>
+                אמת
+              </button>
+            </div>
+            {borrowerError && <div style={s.alertBox}>{borrowerError}</div>}
+          </>
+        )}
         {borrower && (
           <div style={s.borrowerBox}>
             <div style={{ fontWeight: 600 }}>
@@ -410,6 +719,9 @@ function CheckoutContent() {
                 {Math.max(0, 10 - (borrower.activeLoans?.length || 0))}
               </span>
             </div>
+            {borrower.activeLoans?.length > 0 && (
+              <ActiveLoansAccordion loans={borrower.activeLoans} />
+            )}
           </div>
         )}
       </div>
@@ -521,13 +833,6 @@ function CheckoutContent() {
             </>
           ) : (
             <>
-              <button
-                style={s.btnFull(T.green, confirming)}
-                disabled={confirming}
-                onClick={handleConfirm}
-              >
-                {confirming ? "מעבד..." : `✓ אשר השאלה (${bookItems.length})`}
-              </button>
               <button
                 style={s.btnOutline(T.accent)}
                 onClick={() => {

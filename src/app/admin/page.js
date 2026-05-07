@@ -119,9 +119,58 @@ function CP({ text, children }) {
   );
 }
 
+// ── Draggable Modal Hook ──────────────────────────────────
+function useDraggable() {
+  const [pos, setPos] = React.useState(null);
+  const dragging = React.useRef(false);
+  const offset = React.useRef({ x: 0, y: 0 });
+  const boxRef = React.useRef(null);
+
+  function onMouseDown(e) {
+    if (e.target.closest("input,textarea,select,button,label")) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    dragging.current = true;
+    offset.current = { x: e.clientX - box.left, y: e.clientY - box.top };
+    e.preventDefault();
+  }
+
+  React.useEffect(() => {
+    function onMove(e) {
+      if (!dragging.current) return;
+      setPos({
+        x: e.clientX - offset.current.x,
+        y: e.clientY - offset.current.y,
+      });
+    }
+    function onUp() {
+      dragging.current = false;
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const style = pos
+    ? {
+        position: "fixed",
+        left: pos.x,
+        top: pos.y,
+        transform: "none",
+        margin: 0,
+        zIndex: 1001,
+      }
+    : {};
+
+  return { style, onMouseDown };
+}
+
 // ── Book Modal ─────────────────────────────────────────────
 function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
   const isEdit = !!book && !book._isDuplicate;
+  const drag = useDraggable();
   const [form, setForm] = useState(
     book || {
       tempCopyCode: "",
@@ -186,11 +235,7 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
       : filteredCats;
 
   function handleRoomChange(room) {
-    setForm((f) => ({
-      ...f,
-      room,
-      area: room === "ספרייה" && f.category ? f.category : "",
-    }));
+    setForm((f) => ({ ...f, room, area: "" }));
   }
   function handleCategorySelect(cat) {
     setForm((f) => ({
@@ -265,6 +310,8 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
       fontSize: 17,
       marginBottom: 20,
       color: T.text,
+      cursor: "grab",
+      userSelect: "none",
     },
     grid: {
       display: "grid",
@@ -431,7 +478,11 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
 
   return (
     <div style={s.overlay} onClick={onClose}>
-      <div style={s.box} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{ ...s.box, ...drag.style, cursor: "grab" }}
+        onMouseDown={drag.onMouseDown}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={s.title}>{isEdit ? "עריכת ספר" : "הוספת ספר"}</div>
         {error && <div style={s.alert}>{error}</div>}
         <div style={s.grid}>
@@ -694,6 +745,7 @@ function BulkPolicyModal({ count, onClose, onSave }) {
 
 // ── Borrower Modal ─────────────────────────────────────────
 function BorrowerModal({ borrower, onClose, onSave }) {
+  const drag = useDraggable();
   const [form, setForm] = useState(
     borrower || {
       borrowerID: "",
@@ -823,11 +875,13 @@ function BorrowerModal({ borrower, onClose, onSave }) {
     },
   };
 
-  const F = (key, label, full) => (
+  const F = (key, label, full, _unused, inputMode) => (
     <div style={full ? { ...s.field, gridColumn: "1 / -1" } : s.field}>
       <label style={s.label}>{label}</label>
       <input
         style={s.input}
+        type="text"
+        inputMode={inputMode || "text"}
         value={form[key] || ""}
         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         onFocus={(e) => (e.target.style.borderColor = T.accent)}
@@ -838,11 +892,15 @@ function BorrowerModal({ borrower, onClose, onSave }) {
 
   return (
     <div style={s.overlay} onClick={onClose}>
-      <div style={s.box} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{ ...s.box, ...drag.style, cursor: "grab" }}
+        onMouseDown={drag.onMouseDown}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={s.title}>{isEdit ? "עריכת שואל" : "הוספת שואל"}</div>
         {error && <div style={s.alert}>{error}</div>}
         <div style={s.grid}>
-          {F("borrowerID", 'מספר ת"ז *')}
+          {F("borrowerID", 'מספר ת"ז *', false, false, "text")}
           {F("firstName", "שם פרטי *")}
           {F("lastName", "שם משפחה *")}
           <div style={s.field}>
@@ -861,7 +919,7 @@ function BorrowerModal({ borrower, onClose, onSave }) {
             </select>
           </div>
           {F("year", "מחזור (תלמידים בלבד)")}
-          {F("phone", "טלפון")}
+          {F("phone", "טלפון", false, false, "tel")}
           {F("email", "אימייל")}
           <div style={s.field}>
             <label style={s.label}>חסום</label>
@@ -1319,6 +1377,30 @@ function BookRow({
                 >
                   ⧉ שכפל
                 </button>
+                {!borrowed && !inactive && (
+                  <a
+                    href={`/checkout?copyCode=${r.tempCopyCode}`}
+                    style={{
+                      ...s.btnSmall(T.green),
+                      textDecoration: "none",
+                      display: "inline-block",
+                    }}
+                  >
+                    📖 השאל
+                  </a>
+                )}
+                {borrowed && (
+                  <a
+                    href={`/returns?copyCode=${r.tempCopyCode}`}
+                    style={{
+                      ...s.btnSmall(T.red),
+                      textDecoration: "none",
+                      display: "inline-block",
+                    }}
+                  >
+                    ↩️ החזר
+                  </a>
+                )}
                 {!inactive && (
                   <button
                     style={s.btnSmall(T.yellow)}
@@ -1349,10 +1431,194 @@ function BookRow({
   );
 }
 
+// ── Checkout Modal (from borrower) ────────────────────────
+function CheckoutModal({ borrowerID, onClose, onDone }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function handleSearch(q) {
+    setQuery(q);
+    if (q.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/books?q=${encodeURIComponent(q)}&limit=20`);
+      const data = await res.json();
+      setResults((data.results || []).filter((b) => !b.isBorrowed));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCheckout(book) {
+    setMsg("");
+    try {
+      const res = await fetch("/api/loans/checkout-multi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ borrowerID, serialNums: [book.tempCopyCode] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg(data.error || "שגיאה");
+        return;
+      }
+      setMsg(`✓ "${book.bookName}" הושאל בהצלחה`);
+      setResults([]);
+      setQuery("");
+      setTimeout(onDone, 1200);
+    } catch {
+      setMsg("שגיאת שרת");
+    }
+  }
+
+  const s = {
+    overlay: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.4)",
+      zIndex: 1000,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    box: {
+      background: T.surface,
+      borderRadius: T.radius,
+      padding: 24,
+      maxWidth: 460,
+      width: "90%",
+      boxShadow: T.shadowLg,
+      maxHeight: "80vh",
+      overflow: "auto",
+    },
+    title: {
+      fontFamily: T.fontDisplay,
+      fontWeight: 700,
+      fontSize: 16,
+      marginBottom: 16,
+      color: T.text,
+    },
+    input: {
+      width: "100%",
+      padding: "9px 14px",
+      border: `1.5px solid ${T.border}`,
+      borderRadius: T.radiusSm,
+      fontSize: 13.5,
+      outline: "none",
+      fontFamily: T.fontBody,
+      marginBottom: 12,
+      boxSizing: "border-box",
+    },
+    item: {
+      padding: "10px 14px",
+      borderRadius: T.radiusSm,
+      border: `1px solid ${T.border}`,
+      marginBottom: 6,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      background: T.surface,
+    },
+    btn: (color) => ({
+      padding: "5px 12px",
+      borderRadius: T.radiusSm,
+      background: color,
+      color: "#fff",
+      border: "none",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      fontFamily: T.fontBody,
+    }),
+    btnGhost: {
+      padding: "8px 16px",
+      borderRadius: T.radiusSm,
+      background: "transparent",
+      color: T.text2,
+      border: `1px solid ${T.border}`,
+      fontSize: 13,
+      cursor: "pointer",
+      fontFamily: T.fontBody,
+    },
+    success: {
+      padding: "10px 14px",
+      borderRadius: T.radiusSm,
+      background: T.greenLt,
+      color: T.green,
+      border: `1px solid ${T.greenBorder}`,
+      fontSize: 13,
+      marginBottom: 10,
+    },
+    error: {
+      padding: "10px 14px",
+      borderRadius: T.radiusSm,
+      background: T.redLt,
+      color: T.red,
+      border: `1px solid ${T.redBorder}`,
+      fontSize: 13,
+      marginBottom: 10,
+    },
+  };
+
+  return (
+    <div style={s.overlay} onClick={onClose}>
+      <div style={s.box} onClick={(e) => e.stopPropagation()}>
+        <div style={s.title}>הוסף השאלה</div>
+        {msg && (
+          <div style={msg.startsWith("✓") ? s.success : s.error}>{msg}</div>
+        )}
+        <input
+          style={s.input}
+          placeholder="חפש ספר לפי שם או קוד..."
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={(e) => (e.target.style.borderColor = T.accent)}
+          onBlur={(e) => (e.target.style.borderColor = T.border)}
+          autoFocus
+        />
+        {loading && <div style={{ fontSize: 13, color: T.text3 }}>מחפש...</div>}
+        {results.map((book) => (
+          <div key={book.tempCopyCode} style={s.item}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                {book.bookName}
+              </div>
+              <div style={{ fontSize: 11, color: T.text3 }}>
+                {book.authorName} · {book.tempCopyCode}
+              </div>
+            </div>
+            <button style={s.btn(T.green)} onClick={() => handleCheckout(book)}>
+              השאל
+            </button>
+          </div>
+        ))}
+        {!loading && query.length >= 2 && results.length === 0 && (
+          <div style={{ fontSize: 13, color: T.text3 }}>
+            לא נמצאו ספרים פנויים
+          </div>
+        )}
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}
+        >
+          <button style={s.btnGhost} onClick={onClose}>
+            סגור
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Borrower Row ───────────────────────────────────────────
 function BorrowerRow({ r, s, td, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(null);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   useEffect(() => {
     if (open && !full) {
@@ -1596,12 +1862,39 @@ function BorrowerRow({ r, s, td, onEdit, onDelete }) {
                           }}
                         >
                           <span style={{ fontWeight: 500 }}>
-                            {l.bookName || l.bookID}
+                            <CP text={l.bookName || l.bookID}>
+                              {l.bookName || l.bookID}
+                            </CP>
                           </span>
-                          <span style={{ color: T.text3, fontSize: 12 }}>
-                            {l.loanDate}
-                            {l.dueDate && ` · עד ${l.dueDate}`}
-                          </span>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <span style={{ color: T.text3, fontSize: 12 }}>
+                              {l.loanDate}
+                              {l.dueDate && ` · עד ${l.dueDate}`}
+                            </span>
+                            <a
+                              href={`/returns?copyCode=${l.bookID}`}
+                              style={{
+                                padding: "3px 10px",
+                                borderRadius: T.radiusSm,
+                                background: "transparent",
+                                color: T.red,
+                                border: `1px solid ${T.red}`,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: T.fontBody,
+                                textDecoration: "none",
+                              }}
+                            >
+                              החזר
+                            </a>
+                          </div>
                         </div>
                       ))}
                     </>
@@ -1619,10 +1912,30 @@ function BorrowerRow({ r, s, td, onEdit, onDelete }) {
                 <button style={s.btnSmall(T.accent)} onClick={() => onEdit(r)}>
                   ✏️ ערוך
                 </button>
+                <button
+                  style={s.btnSmall(T.green)}
+                  onClick={() => setShowCheckout(true)}
+                >
+                  📖 הוסף השאלה
+                </button>
                 <button style={s.btnSmall(T.red)} onClick={() => onDelete(r)}>
                   🗑️ מחק
                 </button>
               </div>
+              {showCheckout && (
+                <CheckoutModal
+                  borrowerID={r.borrowerID}
+                  onClose={() => setShowCheckout(false)}
+                  onDone={() => {
+                    setShowCheckout(false);
+                    setFull(null);
+                    fetch(`/api/borrowers/${encodeURIComponent(r.borrowerID)}`)
+                      .then((res) => res.json())
+                      .then(setFull)
+                      .catch(() => {});
+                  }}
+                />
+              )}
             </div>
           </td>
         </tr>

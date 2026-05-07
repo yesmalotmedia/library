@@ -4,14 +4,30 @@ import { getAllLoans } from "@/lib/repositories/loans.repo";
 import { getBookById } from "@/lib/repositories/books.repo";
 import { calcShiur } from "@/lib/constants/settings";
 
+function normalizeTZ(id) {
+  const s = String(id).trim();
+  // נסה גם עם וגם בלי 0 מוביל
+  return [s, s.replace(/^0+/, ""), s.padStart(9, "0")];
+}
+
 export async function GET(request, { params }) {
   try {
-    const borrower = getBorrowerById(params.borrowerID);
+    const candidates = normalizeTZ(params.borrowerID);
+    let borrower = null;
+    let usedID = params.borrowerID;
+    for (const id of candidates) {
+      borrower = getBorrowerById(id);
+      if (borrower) {
+        usedID = id;
+        break;
+      }
+    }
+
     if (!borrower)
       return NextResponse.json({ error: "שואל לא נמצא" }, { status: 404 });
 
     const allLoans = getAllLoans().filter(
-      (l) => l.borrowerID === String(params.borrowerID),
+      (l) => l.borrowerID === String(usedID),
     );
     const activeLoans = allLoans.filter(
       (l) => !l.ReturnAtDate || l.ReturnAtDate.trim() === "",
@@ -20,7 +36,6 @@ export async function GET(request, { params }) {
       (l) => l.ReturnAtDate && l.ReturnAtDate.trim() !== "",
     );
 
-    // הוסף שם ספר לכל השאלה פעילה
     const activeLoansWithBooks = activeLoans.map((l) => {
       const book = getBookById(l.bookID);
       return { ...l, bookName: book?.bookName || null };
