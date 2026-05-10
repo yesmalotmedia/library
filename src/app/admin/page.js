@@ -85,13 +85,25 @@ function CP({ text, children }) {
         onMouseLeave={() => setBtnHover(false)}
         onClick={(e) => {
           e.stopPropagation();
-          navigator.clipboard
-            .writeText(text || "")
-            .then(() => {
-              setOk(true);
-              setTimeout(() => setOk(false), 1200);
-            })
-            .catch(() => {});
+          const t2 = text || "";
+          if (navigator.clipboard) {
+            navigator.clipboard
+              .writeText(t2)
+              .then(() => {
+                setOk(true);
+                setTimeout(() => setOk(false), 1200);
+              })
+              .catch(() => {});
+          } else {
+            const el = document.createElement("textarea");
+            el.value = t2;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand("copy");
+            document.body.removeChild(el);
+            setOk(true);
+            setTimeout(() => setOk(false), 1200);
+          }
         }}
         style={{
           visibility: show || ok ? "visible" : "hidden",
@@ -235,7 +247,11 @@ function BookModal({ book, onClose, onSave, onSaveAndAdd }) {
       : filteredCats;
 
   function handleRoomChange(room) {
-    setForm((f) => ({ ...f, room, area: "" }));
+    setForm((f) => ({
+      ...f,
+      room,
+      area: room === "ספרייה" && f.category ? f.category : "",
+    }));
   }
   function handleCategorySelect(cat) {
     setForm((f) => ({

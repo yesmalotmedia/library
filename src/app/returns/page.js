@@ -130,6 +130,8 @@ function ReturnsContent() {
           bookName: data.bookName,
           authorName: data.authorName,
           activeLoan: data.activeLoan,
+          room: data.room || "",
+          area: data.area || "",
         },
       ]);
       setCurrentCode("");
@@ -358,7 +360,7 @@ function ReturnsContent() {
                 }}
               >
                 {r.success
-                  ? `✓ הוחזר · ${r.data.loan?.ReturnAtDate}`
+                  ? `✓ הוחזר${r.room || r.area ? ` · נא להחזיר ל: ${[r.room, r.area].filter(Boolean).join(" - ")}` : ""}`
                   : `✗ ${r.data.error}`}
               </div>
             </div>
