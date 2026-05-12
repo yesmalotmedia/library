@@ -1,7 +1,13 @@
 ﻿"use client";
-import { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
+import {
+  MAX_COPY_CODE,
+  MAX_BOOK_NAME,
+  MAX_AUTHOR_NAME,
+  MAX_CATEGORY,
+} from "@/lib/constants";
 
 const AREAS_LIBRARY = [
   "ספרייה עגולה",
@@ -336,6 +342,78 @@ function AccordionContent({ book, onNotify }) {
   );
 }
 
+// ── Copy Button ─────────────────────────────────────────
+function CP({ text, children }) {
+  const [ok, setOk] = React.useState(false);
+  const [show, setShow] = React.useState(false);
+  const [btnHover, setBtnHover] = React.useState(false);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        cursor: "default",
+      }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => {
+        setShow(false);
+        setBtnHover(false);
+      }}
+    >
+      {children}
+      <button
+        type="button"
+        onMouseEnter={() => setBtnHover(true)}
+        onMouseLeave={() => setBtnHover(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          const t2 = text || "";
+          if (navigator.clipboard) {
+            navigator.clipboard
+              .writeText(t2)
+              .then(() => {
+                setOk(true);
+                setTimeout(() => setOk(false), 1200);
+              })
+              .catch(() => {});
+          } else {
+            const el = document.createElement("textarea");
+            el.value = t2;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand("copy");
+            document.body.removeChild(el);
+            setOk(true);
+            setTimeout(() => setOk(false), 1200);
+          }
+        }}
+        style={{
+          visibility: show || ok ? "visible" : "hidden",
+          width: 46,
+          height: 18,
+          borderRadius: 3,
+          fontSize: 10,
+          fontWeight: 600,
+          cursor: "pointer",
+          background: ok ? T.green : btnHover ? T.green : T.surface2,
+          color: ok || btnHover ? "#fff" : T.text3,
+          border: `1px solid ${ok || btnHover ? T.green : T.border}`,
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 1,
+        }}
+      >
+        {ok ? "✓" : "העתק"}
+      </button>
+    </span>
+  );
+}
+
 // ── Book row ───────────────────────────────────────────────
 function BookRow({ book, expandedId, onToggle, onNotify }) {
   const isExpanded = expandedId === book.tempCopyCode;
@@ -425,13 +503,15 @@ function BookRow({ book, expandedId, onToggle, onNotify }) {
               whiteSpace: "nowrap",
             }}
           >
-            {book.bookName || "—"}
+            <CP text={book.bookName}>{book.bookName || "—"}</CP>
           </div>
         </td>
         <td style={tdBase({ color: T.text2 })}>
-          {book.authorName
-            ? `${book.authorName}${book.authorRole ? ` (${book.authorRole})` : ""}`
-            : "—"}
+          <CP text={book.authorName}>
+            {book.authorName
+              ? `${book.authorName}${book.authorRole ? ` (${book.authorRole})` : ""}`
+              : "—"}
+          </CP>
         </td>
         <td style={tdBase({ color: T.text2, fontSize: 13 })}>
           {location || "—"}
@@ -794,6 +874,15 @@ export default function SearchPage() {
       <input
         style={s.fieldInput}
         placeholder={`${placeholder}...`}
+        maxLength={
+          key === "copyCode"
+            ? MAX_COPY_CODE
+            : key === "authorName"
+              ? MAX_AUTHOR_NAME
+              : key === "category"
+                ? MAX_CATEGORY
+                : MAX_BOOK_NAME
+        }
         value={advFields[key]}
         onChange={(e) => setAdvFields((p) => ({ ...p, [key]: e.target.value }))}
         onFocus={(e) => (e.target.style.borderColor = T.accent)}
@@ -822,6 +911,7 @@ export default function SearchPage() {
               <input
                 style={s.input}
                 placeholder="שם ספר, מחבר, קוד ספר..."
+                maxLength={MAX_BOOK_NAME}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
@@ -1077,107 +1167,6 @@ export default function SearchPage() {
         </div>
       )}
 
-      {totalPages > 1 && searched && !loading && (
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <button
-            style={{
-              padding: "7px 14px",
-              borderRadius: T.radiusSm,
-              background: "transparent",
-              color: T.text2,
-              border: `1px solid ${T.border}`,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: page === 1 ? "not-allowed" : "pointer",
-              fontFamily: T.fontBody,
-              opacity: page === 1 ? 0.4 : 1,
-            }}
-            disabled={page === 1}
-            onClick={() => {
-              setPage(1);
-              doSearch(query, 1);
-            }}
-          >
-            ⏮
-          </button>
-          <button
-            style={{
-              padding: "7px 14px",
-              borderRadius: T.radiusSm,
-              background: "transparent",
-              color: T.text2,
-              border: `1px solid ${T.border}`,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: page === 1 ? "not-allowed" : "pointer",
-              fontFamily: T.fontBody,
-              opacity: page === 1 ? 0.4 : 1,
-            }}
-            disabled={page === 1}
-            onClick={() => {
-              const p = page - 1;
-              setPage(p);
-              doSearch(query, p);
-            }}
-          >
-            → הקודם
-          </button>
-          <span style={{ fontSize: 13, color: T.text3 }}>
-            {page} / {totalPages}
-          </span>
-          <button
-            style={{
-              padding: "7px 14px",
-              borderRadius: T.radiusSm,
-              background: "transparent",
-              color: T.text2,
-              border: `1px solid ${T.border}`,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: page === totalPages ? "not-allowed" : "pointer",
-              fontFamily: T.fontBody,
-              opacity: page === totalPages ? 0.4 : 1,
-            }}
-            disabled={page === totalPages}
-            onClick={() => {
-              const p = page + 1;
-              setPage(p);
-              doSearch(query, p);
-            }}
-          >
-            הבא ←
-          </button>
-          <button
-            style={{
-              padding: "7px 14px",
-              borderRadius: T.radiusSm,
-              background: "transparent",
-              color: T.text2,
-              border: `1px solid ${T.border}`,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: page === totalPages ? "not-allowed" : "pointer",
-              fontFamily: T.fontBody,
-              opacity: page === totalPages ? 0.4 : 1,
-            }}
-            disabled={page === totalPages}
-            onClick={() => {
-              setPage(totalPages);
-              doSearch(query, totalPages);
-            }}
-          >
-            ⏭
-          </button>
-        </div>
-      )}
-
       {results.length > 0 && (
         <div style={s.tableWrap}>
           <table style={s.table}>
@@ -1207,6 +1196,107 @@ export default function SearchPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "12px 0",
+              }}
+            >
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === 1 ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === 1 ? 0.4 : 1,
+                }}
+                disabled={page === 1}
+                onClick={() => {
+                  setPage(1);
+                  doSearch(query, 1);
+                }}
+              >
+                ⏭
+              </button>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === 1 ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === 1 ? 0.4 : 1,
+                }}
+                disabled={page === 1}
+                onClick={() => {
+                  const p = page - 1;
+                  setPage(p);
+                  doSearch(query, p);
+                }}
+              >
+                → הקודם
+              </button>
+              <span style={{ fontSize: 13, color: T.text3 }}>
+                {page} / {totalPages}
+              </span>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === totalPages ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === totalPages ? 0.4 : 1,
+                }}
+                disabled={page === totalPages}
+                onClick={() => {
+                  const p = page + 1;
+                  setPage(p);
+                  doSearch(query, p);
+                }}
+              >
+                הבא ←
+              </button>
+              <button
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: T.radiusSm,
+                  background: "transparent",
+                  color: T.text2,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: page === totalPages ? "not-allowed" : "pointer",
+                  fontFamily: T.fontBody,
+                  opacity: page === totalPages ? 0.4 : 1,
+                }}
+                disabled={page === totalPages}
+                onClick={() => {
+                  setPage(totalPages);
+                  doSearch(query, totalPages);
+                }}
+              >
+                ⏮
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

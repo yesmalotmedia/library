@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { CSV_PATHS } from "./csv/csvPaths.js";
 
-const BACKUP_DIR = "G:\\האחסון שלי\\library-backup";
+const BACKUP_DIR = "H:\\האחסון שלי\\library-backup";
 const MAX_BACKUPS = 30;
 
 function ensureBackupDir() {

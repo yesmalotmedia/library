@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { MAX_BORROWER_ID, MAX_COPY_CODE } from "@/lib/constants";
 import { useSearchParams } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
@@ -337,6 +338,7 @@ function MyContent() {
           <input
             style={{ ...s.input, marginBottom: 16 }}
             placeholder='הכנס מספר ת"ז...'
+            maxLength={MAX_BORROWER_ID}
             value={tzInput}
             onChange={(e) => {
               setTzInput(e.target.value);
@@ -550,6 +552,7 @@ function MyContent() {
             <input
               style={{ ...s.input, flex: 1 }}
               placeholder="קוד ספר..."
+              maxLength={MAX_COPY_CODE}
               value={waitlistCode}
               onChange={(e) => {
                 setWaitlistCode(e.target.value);

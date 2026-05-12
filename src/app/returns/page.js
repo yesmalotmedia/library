@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { MAX_COPY_CODE } from "@/lib/constants";
 import { useSearchParams, useRouter } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
@@ -400,6 +401,7 @@ function ReturnsContent() {
               ref={inputRef}
               style={s.input}
               placeholder="הזן קוד ספר ולחץ Enter..."
+              maxLength={MAX_COPY_CODE}
               value={currentCode}
               onChange={(e) => {
                 setCurrentCode(e.target.value);

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
+import { MAX_BORROWER_ID, MAX_COPY_CODE } from "@/lib/constants";
 import { useSearchParams, useRouter } from "next/navigation";
 import useResponsive from "@/hooks/useResponsive";
 import { T } from "@/lib/theme";
@@ -676,6 +677,7 @@ function CheckoutContent() {
               <input
                 style={s.input(false)}
                 placeholder='הכנס מספר ת"ז...'
+                maxLength={MAX_BORROWER_ID}
                 value={borrowerID}
                 onChange={(e) => {
                   setBorrowerID(e.target.value);
@@ -734,6 +736,7 @@ function CheckoutContent() {
               ref={inputRef}
               style={s.input(false)}
               placeholder="הזן קוד ספר ולחץ Enter..."
+              maxLength={MAX_COPY_CODE}
               value={currentCode}
               onChange={(e) => {
                 setCurrentCode(e.target.value);
@@ -802,6 +805,7 @@ function CheckoutContent() {
                   ref={codeRef}
                   style={s.input(false)}
                   placeholder="הזן קוד ספר נוסף ולחץ Enter..."
+                  maxLength={MAX_COPY_CODE}
                   value={currentCode}
                   onChange={(e) => {
                     setCurrentCode(e.target.value);
